@@ -127,6 +127,7 @@ ambientes          -- mapas/rooms dentro de um server
   collision     bytea            -- bitset (W/16)*(H/16) bits
   spawn_x       int              -- célula
   spawn_y       int
+  chat_radius   int              -- raio de chat por proximidade, em células (§9)
   created_at    timestamptz
 
 player_positions   -- "lembrar onde o jogador estava"
@@ -259,9 +260,16 @@ Canvas com **duas camadas** e duas ferramentas (conforme spec):
 2. **Ferramenta de colisão** (edita o grid de células 16×16):
    - Pinta/limpa células bloqueadas; overlay semitransparente sobre a arte.
    - Botão para marcar **spawn point**.
-3. Nome do servidor + **salvar** → cria `server` + `ambiente`.
+3. **Raio de chat (proximidade)** — controle interativo:
+   - Slider/stepper que define `chat_radius` (em **células**); mostra o valor
+     atual (ex.: "Raio: 5 células ≈ 80px").
+   - **Pré-visualização ao vivo**: ao ajustar, desenha o **círculo do raio** sobre
+     o mapa (centrado num ponto de exemplo, ex.: o spawn), para o host enxergar o
+     alcance real antes de salvar.
+   - Persistido em `ambientes.chat_radius` e usado pelo servidor no roteamento.
+4. Nome do servidor + **salvar** → cria `server` + `ambiente`.
 
-Decisões de UX: alternância clara entre modo Arte e modo Colisão; undo/redo
+Decisões de UX: alternância clara entre modos (Arte / Colisão / Raio); undo/redo
 (stack de operações); tamanho do mundo configurável (múltiplos de 16).
 
 (*Melhoria*) Colocar **portais** ligando ambientes (modo extra de edição).
@@ -289,10 +297,11 @@ Camadas de segurança (incremental):
 Só converso com quem está **perto** do meu player. O alcance reforça o caráter
 efêmero/seguro: a mensagem nem chega a quem está fora do raio.
 
-- **Raio**: `CHAT_RADIUS` em **células** (default sugerido: **5 células** ≈
-  80px; configurável por ambiente). Distância de **Chebyshev** (quadrado ao
-  redor) ou **Euclidiana** (círculo) — recomendo círculo (Euclidiana) por ser
-  mais intuitivo. A definir no §13.
+- **Raio**: `chat_radius` em **células**, **definido pelo host no editor do
+  servidor** (controle interativo com pré-visualização do círculo — ver §8).
+  Default sugerido: **5 células** ≈ 80px. Distância de **Chebyshev** (quadrado)
+  ou **Euclidiana** (círculo) — recomendo círculo (Euclidiana) por ser mais
+  intuitivo e bater com o preview circular do editor. A definir no §13.
 - **Roteamento autoritativo** (servidor): ao receber um `chat`, calcula os
   jogadores dentro do raio do remetente e relaya **só para eles** (incluindo o
   próprio remetente). Quem está fora **não recebe** a mensagem.
@@ -383,8 +392,9 @@ como backlog.
 3. **Tamanho de mundo**: limite fixo (ex.: 64×64 células = 1024×1024 px) ou
    configurável pelo host? Há limite de banda/armazenamento desejado?
 4. **Multi-ambiente** entra no MVP ou fica como fase 2?
-8. **Proximidade**: raio default (5 células?) e forma (círculo Euclidiano vs.
-   quadrado Chebyshev)? O raio é fixo, por ambiente, ou ajustável pelo host?
+8. **Proximidade**: raio é configurável pelo host no editor (decidido). Falta:
+   forma (círculo Euclidiano vs. quadrado Chebyshev) e o valor **default** /
+   limites min–max do slider.
 5. **E2E** do chat: MVP ou backlog? (afeta moderação)
 6. **Idioma do código/UI**: PT-BR, EN, ou i18n desde o início?
 7. **Moderação/abuso**: precisamos de report/ban no MVP, ou só rate limit?
