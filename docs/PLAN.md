@@ -105,9 +105,9 @@ users
 
 avatars
   user_id       uuid pk fk->users
-  -- sprite 16x16; armazenado compacto (ver §6)
-  data          bytea            -- PNG indexado OU 256 índices de paleta
-  palette       jsonb null       -- se usar paleta indexada
+  -- sprite 16x16 MONOCROMÁTICO: 1 bit/pixel = 256 bits = 32 bytes (ver §6)
+  bits          bytea            -- exatamente 32 bytes (silhueta on/off)
+  color         text null        -- cor única de exibição (opcional; a definir)
   updated_at    timestamptz
 
 servers            -- "Hub"
@@ -152,8 +152,9 @@ portais (melhoria)
 ## 5. Telas / fluxos de UX
 
 1. **Login** — botão "Entrar com Google" e "Entrar como convidado".
-2. **Criação/edição de avatar** — editor 16×16 (pincel/borracha/balde + paleta)
-   e botão **"Gerar aleatório"** (sprite procedural simétrico). Salva no user.
+2. **Criação/edição de avatar** — editor 16×16 **monocromático** (lápis/borracha
+   /balde, pixels on/off, sem paleta) e botão **"Gerar aleatório"** (silhueta
+   procedural simétrica). Salva no user.
 3. **Lista de servidores ativos** — cards com nome, nº de jogadores online,
    preview do mapa. Botões: *Entrar* / *Criar servidor*.
 4. **Criar servidor** — nome + **editor de mapa** (§8).
@@ -168,20 +169,32 @@ portais (melhoria)
 No chat, cada mensagem mostra uma **miniatura do avatar 16×16** do remetente ao
 lado do texto.
 
+Na **parte inferior** do game view há uma **barra de ouvintes**: as miniaturas
+dos avatares dos jogadores que estão dentro do meu raio de chat (quem vai me
+escutar). Mostra até 5 e, se houver mais, um indicador **"+X"** (§9).
+
 ---
 
-## 6. Formato do avatar (sprite 16×16)
+## 6. Formato do avatar (sprite 16×16 **monocromático**)
 
-- 256 pixels RGBA. Duas representações suportadas:
-  - **Paleta indexada** (recomendado): paleta de até 16 cores (`palette: string[]`
-    hex) + 256 índices (4 bits cada → 128 bytes). Compacto e fácil de editar.
-  - **PNG**: fallback/export. Pequeno o suficiente para trafegar inline.
-- API trafega como JSON (`{ palette, indices }`) ou base64 PNG.
-- **Gerador aleatório**: pinta metade e espelha horizontalmente (estilo
-  identicon), paleta randômica com 1–2 cores + contorno → resultados agradáveis
-  e únicos.
-- **Miniatura no chat**: o cliente já tem o sprite; renderiza num `<canvas>`
-  16×16 escalado com `image-rendering: pixelated`. Sem custo de rede extra.
+O personagem desenhado pelo jogador é **monocor**: cada pixel é apenas
+**ligado/desligado** (silhueta), sem paleta de cores.
+
+- **Representação**: bitmap **1 bit por pixel** → 256 bits = **32 bytes**.
+  Extremamente compacto (cabe num `BIGINT[4]` ou `bytea(32)`/base64 de 44 chars).
+- **Cor de render é do tema/cliente**, não do dado: o servidor guarda só a
+  silhueta (on/off). O cliente pinta com a cor do tema (ex.: foreground sobre
+  fundo transparente). Opcional: um único campo `color` por usuário se quisermos
+  permitir escolher a cor de exibição — **a definir** (não altera o "monocor",
+  só a cor única de pintura).
+- **Editor**: grade 16×16 com toggle de pixel; ferramentas **lápis** (liga),
+  **borracha** (desliga) e **balde** (flood fill liga/desliga). Sem seletor de
+  cor — só preto/branco lógico (on/off).
+- **Gerador aleatório**: liga pixels numa metade e **espelha horizontalmente**
+  (estilo identicon) → silhuetas simétricas e únicas, com densidade controlada.
+- **Miniatura no chat e barra de ouvintes**: o cliente tem os 32 bytes; renderiza
+  num `<canvas>` 16×16 escalado com `image-rendering: pixelated`, pintando os
+  pixels ligados na cor do tema. Sem custo de rede extra.
 
 ---
 
@@ -198,6 +211,10 @@ lado do texto.
   (ex.: 10–15 Hz) para economizar banda; chat é enviado imediatamente (relay).
 - **Reconciliação**: cliente faz *predição* otimista do passo e corrige se o
   servidor divergir (raro em grid-based). Interpolação suaviza o render.
+- **Proximidade (autoritativa)**: como o servidor já conhece todas as posições,
+  ele é a autoridade sobre **quem ouve quem**. Cada mensagem só é entregue aos
+  jogadores dentro do raio do remetente, e cada cliente recebe a lista de quem
+  está no seu alcance (ver §9). Cliente nunca recebe msg de quem está longe.
 
 ### Mensagens (definidas em `packages/shared`, validadas com zod)
 
@@ -214,10 +231,17 @@ joined      { you, ambiente: {meta, art, collision, spawn}, players[] }
 state       { players: [{ id, cellX, cellY, dir }], serverTick }  // por tick
 playerJoin  { id, displayName, avatarRef, cellX, cellY }
 playerLeave { id }
-chat        { fromId, displayName, avatarRef, text, ts }  // relay, não salvo
+nearby      { ids: string[] }   // quem está no MEU raio agora (delta ok)
+chat        { fromId, displayName, avatarRef, text, ts }  // SÓ se em raio; não salvo
 correction  { cellX, cellY, seq }                         // se predição divergiu
 pong        {}
 ```
+
+> **Roteamento por proximidade**: o servidor calcula, por jogador, o conjunto de
+> jogadores dentro do raio `CHAT_RADIUS` (distância em células — ver §9) e:
+> 1. relaya cada `chat` **apenas** para os destinatários em raio do remetente;
+> 2. emite `nearby` quando esse conjunto muda (entrou/saiu alguém do alcance),
+>    para alimentar a barra inferior de "quem está ouvindo".
 
 > **`ws` cru + loop próprio** dá controle total e footprint mínimo (preferido
 > para o free tier). **Colyseus** é a alternativa se quisermos sincronização de
@@ -260,6 +284,33 @@ Camadas de segurança (incremental):
 - **Melhoria — sala E2E opt-in**: chave compartilhada derivada no cliente; o
   servidor só faz relay de **ciphertext**. Trade-off: sem moderação server-side.
 
+### Chat por proximidade (mecânica central)
+
+Só converso com quem está **perto** do meu player. O alcance reforça o caráter
+efêmero/seguro: a mensagem nem chega a quem está fora do raio.
+
+- **Raio**: `CHAT_RADIUS` em **células** (default sugerido: **5 células** ≈
+  80px; configurável por ambiente). Distância de **Chebyshev** (quadrado ao
+  redor) ou **Euclidiana** (círculo) — recomendo círculo (Euclidiana) por ser
+  mais intuitivo. A definir no §13.
+- **Roteamento autoritativo** (servidor): ao receber um `chat`, calcula os
+  jogadores dentro do raio do remetente e relaya **só para eles** (incluindo o
+  próprio remetente). Quem está fora **não recebe** a mensagem.
+- **Lista de ouvintes (barra inferior)**: o servidor mantém, por jogador, o
+  conjunto de quem está no seu raio e emite `nearby` quando muda. O cliente
+  renderiza na **parte inferior da tela** as **miniaturas dos avatares** de quem
+  está ouvindo.
+  - Mostra **até 5** avatares; se houver mais, exibe um indicador **"+X"**
+    (ex.: `[a][b][c][d][e] +3`).
+  - Atualiza em tempo real conforme jogadores entram/saem do alcance ao andar.
+  - Útil como feedback: antes de mandar msg, vejo quem vai me escutar.
+- **Feedback visual no mapa** (opcional/melhoria): destacar sutilmente o raio de
+  alcance ao redor do meu player, ou os players dentro dele.
+
+> Nota: como o roteamento é por proximidade, não há "broadcast global" de chat —
+> cada conjunto de destinatários é calculado por mensagem. O `nearby` evita que
+> o cliente precise calcular distância de todos a todos.
+
 ### Entrada de teclado no game view (detalhe importante da spec)
 
 > "Qualquer tecla digita no chat; Enter envia. As setas movimentam o jogador."
@@ -278,6 +329,8 @@ Camadas de segurança (incremental):
 - Split **vertical** (mapa em cima, chat embaixo).
 - **Controles na tela**: **D-pad** (4 direções) sobre/junto ao mapa para mover;
   campo de texto + botão enviar para o chat.
+- **Barra de ouvintes** (proximidade) também presente no rodapé, acima do
+  teclado/controles — até 5 avatares + "+X".
 - Layout responsivo; toques no D-pad emitem as mesmas mensagens `move`.
 
 ---
@@ -289,7 +342,7 @@ Camadas de segurança (incremental):
 | 1 | **Múltiplos ambientes + portais** ("andar por ambientes" literal) | Mundos maiores, exploração entre salas. Já modelado em §3/§4. |
 | 2 | **Chat E2E opt-in por sala** | Reforça o "seguro". §9. |
 | 3 | **Presença/lista de online** no game view | Saber quem está na sala. |
-| 4 | **Chat por proximidade** (opcional) | Só vê msgs de quem está perto — fica imersivo. Continua efêmero. |
+| 4 | ~~Chat por proximidade~~ → **agora mecânica central** (§9) | Só falo com quem está perto; barra de ouvintes "+X" no rodapé. |
 | 5 | **Preview do mapa** na lista de servidores | Mais atrativo escolher sala. |
 | 6 | **Emotes/balões de fala** sobre o avatar no mapa | Liga chat ↔ mundo. |
 | 7 | **Editor: undo/redo, zoom, layers nomeadas** | Qualidade de criação. |
@@ -312,12 +365,14 @@ como backlog.
   arte (lápis/borracha/balde) + editor de colisão + spawn; salvar/carregar.
 - **M3 — Realtime autoritativo**: WS, salas, join, movimento grid-based
   validado, broadcast por tick, interpolação no cliente.
-- **M4 — Chat efêmero**: relay seguro, miniatura de avatar, handler de teclado
+- **M4 — Chat efêmero + proximidade**: relay seguro **por raio**, cálculo de
+  `nearby`, barra de ouvintes ("+X"), miniatura de avatar, handler de teclado
   (setas vs. digitação), rate limit.
 - **M5 — Game view & responsivo**: split 50/50 desktop, split vertical + D-pad
-  mobile, lista de servidores com preview e presença.
+  mobile, barra de ouvintes no rodapé, lista de servidores com preview e
+  presença.
 - **M6 — Melhorias**: portais/multi-ambiente, reconexão com posição salva,
-  (opcional) E2E e proximidade.
+  (opcional) E2E, balões de fala e destaque de raio.
 
 ---
 
@@ -328,6 +383,8 @@ como backlog.
 3. **Tamanho de mundo**: limite fixo (ex.: 64×64 células = 1024×1024 px) ou
    configurável pelo host? Há limite de banda/armazenamento desejado?
 4. **Multi-ambiente** entra no MVP ou fica como fase 2?
+8. **Proximidade**: raio default (5 células?) e forma (círculo Euclidiano vs.
+   quadrado Chebyshev)? O raio é fixo, por ambiente, ou ajustável pelo host?
 5. **E2E** do chat: MVP ou backlog? (afeta moderação)
 6. **Idioma do código/UI**: PT-BR, EN, ou i18n desde o início?
 7. **Moderação/abuso**: precisamos de report/ban no MVP, ou só rate limit?
