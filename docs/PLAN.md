@@ -64,11 +64,11 @@ talkhub/
 ## 3. Conceitos de domínio
 
 - **User**: conta Google **ou** guest. Tem um **Avatar** (sprite 16×16).
-- **Avatar**: sprite pixel-art 16×16 RGBA, criado no editor ou gerado
-  proceduralmente. Persistido e vinculado ao user.
+- **Avatar**: sprite 16×16 monocromático (silhueta on/off) + cor única, criado
+  no editor ou gerado proceduralmente. Persistido e vinculado ao user.
 - **Server (Hub)**: criado por um host. Tem nome e um ou mais **Ambientes**.
 - **Ambiente (Room/Map)**: um mundo pixel-art explorável. Contém:
-  - **Camada de arte**: bitmap pixel-art (decorativo).
+  - **Camada de arte**: bitmap pixel-art indexado por paleta (dados crus).
   - **Camada de colisão**: grid de células de 16px (booleano: bloqueia ou não).
   - **Spawn point(s)**: onde jogadores aparecem.
   - (*Melhoria*) **Portais**: ligam ambientes entre si ("andar por ambientes").
@@ -87,6 +87,25 @@ talkhub/
 Movimento grid-based + servidor autoritativo = validação trivial (a célula
 destino existe? está livre? é adjacente?) e custo de CPU/banda mínimo — ideal
 para o free tier.
+
+### Princípio: pixels são dados crus renderizados (sem PNG)
+
+**Nada é armazenado ou trafegado como PNG/imagem codificada.** Todo conteúdo
+pixel-art é **dado cru** desenhado em `<canvas>` no cliente:
+
+- **Avatar**: 32 bytes de bits (silhueta on/off) + uma cor. Render: pinta os
+  pixels ligados na cor do usuário.
+- **Arte do mapa**: paleta (`hex[]`) + um índice de paleta por pixel
+  (`art_indices`). Render: lê o índice, pinta a cor da paleta. Sem decodificar
+  imagem.
+- **Colisão**: bitset por célula.
+
+Otimizações previstas: **paleta indexada** (1 byte/pixel, ou 4 bits se ≤16
+cores); **RLE** sobre os índices (mundos pixel-art têm grandes áreas de cor
+uniforme → compressão alta e barata); upload do canvas via `ImageData`/typed
+arrays; render com `image-rendering: pixelated` e, se necessário, off-screen
+canvas + dirty-rects. Assim controlamos byte a byte o que vai pra rede e pro
+banco, sem o overhead de encode/decode de PNG.
 
 ---
 
@@ -123,7 +142,8 @@ ambientes          -- mapas/rooms dentro de um server
   name          text
   width_px      int              -- múltiplo de 16
   height_px     int              -- múltiplo de 16
-  art           bytea            -- bitmap pixel-art (PNG comprimido)
+  art_palette   jsonb            -- paleta de cores do mundo: hex[] (até 16/256)
+  art_indices   bytea            -- 1 índice de paleta por pixel (W*H), sem PNG
   collision     bytea            -- bitset (W/16)*(H/16) bits
   spawn_x       int              -- célula
   spawn_y       int
@@ -280,7 +300,35 @@ Decisões de UX: alternância clara entre modos (Arte / Colisão / Raio); undo/r
 
 ## 9. Chat efêmero & segurança
 
-Princípios:
+### Como ocorre a comunicação (sendo efêmero)
+
+"Efêmero" significa **não persistido** — não significa "não acontece". A
+comunicação é **em tempo real, em memória, e some**:
+
+1. Cliente A digita e aperta Enter → envia `chat { text }` pela **WebSocket**.
+2. O **servidor** recebe a mensagem **só na RAM** (nunca escreve em DB/disco/log).
+   Sanitiza, aplica rate limit e carimba `fromId`/`ts`.
+3. O servidor calcula quem está **dentro do raio** de A (proximidade, §abaixo) e
+   faz **relay** (`chat {...}`) por WebSocket **apenas** para esses jogadores
+   conectados naquele instante (incluindo A).
+4. Cada cliente destinatário **renderiza** a mensagem na tela. A referência da
+   mensagem no servidor é descartada — não há "tabela de mensagens".
+
+Implicações (por design):
+- **Sem histórico**: quem entra na sala **não vê** o que foi dito antes. No
+  máximo um **buffer em memória minúsculo por sala** (configurável, default 0 ou
+  poucas linhas) para um scrollback curto da sessão atual; descartado quando a
+  sala esvazia ou o processo reinicia.
+- **Entrega "best-effort" ao vivo**: só quem está **online e em raio** no momento
+  recebe. Sem entrega offline, sem "mensagens não lidas".
+- **Privacidade**: como nada é gravado, não há o que vazar de um banco; o
+  conteúdo existe apenas em trânsito e nas telas de quem estava ouvindo.
+
+> Em resumo: o chat é um **relay de pub/sub em memória, escopado por
+> proximidade**, sobre a mesma conexão WebSocket do jogo — não um sistema de
+> mensagens armazenadas.
+
+### Princípios de segurança
 
 - **Zero persistência**: mensagens nunca tocam DB nem disco nem logs. No máximo
   um **buffer em memória minúsculo por sala** (configurável, default pequeno ou
