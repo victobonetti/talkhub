@@ -31,16 +31,17 @@ talkhub/
 │  ├─ web/            # Front-end (React + Vite + TS), render em Canvas
 │  └─ server/         # Back-end (Node + TS): HTTP/REST + WebSocket autoritativo
 ├─ packages/
-│  └─ shared/         # Tipos, schemas (zod), protocolo WS, constantes
+│  └─ shared/         # Tipos, schemas (zod), mensagens Colyseus, constantes
 ├─ docs/
 └─ ...
 ```
 
 - **Front-end**: SPA React. Renderização do mundo e avatares em `<canvas>`
   (2D ou PixiJS). Editores (avatar e mapa) também em canvas.
-- **Back-end**: um único processo Node responsável por:
-  - REST: auth, CRUD de servidores/mapas, avatar.
-  - WebSocket: game loop autoritativo por sala + relay de chat efêmero.
+- **Back-end**: processo Node responsável por:
+  - REST (Fastify): auth, CRUD de servidores/mapas, avatar.
+  - Realtime (Colyseus): uma `Room` autoritativa por ambiente + relay de chat
+    efêmero por proximidade. Escala horizontal via driver Redis (ver §7).
 - **shared**: definições `zod`/TypeScript usadas pelos dois lados — **uma única
   definição** do protocolo, sem divergência client/server.
 
@@ -52,7 +53,7 @@ talkhub/
 | Render | Canvas 2D (evoluir p/ PixiJS se precisar) | Pixel-art não precisa de GPU pesada no MVP. |
 | Estado client | Zustand | Leve, sem boilerplate. |
 | Back HTTP | Fastify | Performático, TS-first, leve em ARM. |
-| Realtime | `ws` (WebSocket cru) + game loop próprio **ou** Colyseus | Autoritativo. Colyseus já traz salas/sincronização de estado; `ws` dá controle total. Ver §7. |
+| Realtime | **Colyseus** (game server autoritativo, salas) | **Decidido.** Salas, state-sync binário, reconexão e **escala horizontal** (driver Redis + presence) prontos. Ver §7. |
 | DB | **PostgreSQL** (Prisma ou Drizzle) | **Decidido** a partir do M0. Robusto, roda bem no free tier ARM. |
 | Auth | Google OAuth 2.0 (OIDC) + JWT próprio p/ sessão e guest | Sem dependência de auth gerenciado. |
 
@@ -221,54 +222,83 @@ O personagem desenhado pelo jogador é **monocor**: cada pixel é apenas
 
 ---
 
-## 7. Protocolo realtime (WebSocket, servidor autoritativo)
+## 7. Realtime com Colyseus (servidor autoritativo)
 
-### Loop e salas
+Realtime roda em **Colyseus**: **uma `Room` por ambiente** (`AmbienteRoom`). A
+escolha mira **escala** — Colyseus distribui salas entre processos com o **driver
+Redis + presence**, então dá para crescer horizontalmente sem reescrever a
+lógica de sala (ver §abaixo).
 
-- Uma **sala por ambiente**. Servidor mantém em memória: jogadores conectados,
-  posição (célula), avatar id e timestamp.
-- **Movimento grid-based**: cliente envia *intenção* de mover numa direção; o
-  servidor valida (adjacência, limites, colisão) e, se válido, aplica e
-  **broadcasta** a nova posição. Cliente nunca decide sua própria posição final.
-- **Tick / broadcast**: estado de movimento agregado e enviado em ticks
-  (ex.: 10–15 Hz) para economizar banda; chat é enviado imediatamente (relay).
-- **Reconciliação**: cliente faz *predição* otimista do passo e corrige se o
-  servidor divergir (raro em grid-based). Interpolação suaviza o render.
-- **Proximidade (autoritativa)**: como o servidor já conhece todas as posições,
-  ele é a autoridade sobre **quem ouve quem**. Cada mensagem só é entregue aos
-  jogadores dentro do raio do remetente, e cada cliente recebe a lista de quem
-  está no seu alcance (ver §9). Cliente nunca recebe msg de quem está longe.
+### Estado da sala (Schema) — sincronizado automaticamente
 
-### Mensagens (definidas em `packages/shared`, validadas com zod)
+O movimento é o único dado **sincronizado por state-sync** (patches binários do
+Colyseus). Como as salas são pequenas, sincronizamos **todos** os players da
+sala (sem `@filter()`), o que mantém o MVP simples:
 
-Client → Server:
 ```
-join        { ambienteId }
-move        { dir: 'up'|'down'|'left'|'right', seq }   // intenção
-chat        { text }                                   // efêmero
-ping        {}
-```
-Server → Client:
-```
-joined      { you, ambiente: {meta, art, collision, spawn}, players[] }
-state       { players: [{ id, cellX, cellY, dir }], serverTick }  // por tick
-playerJoin  { id, displayName, avatarRef, cellX, cellY }
-playerLeave { id }
-nearby      { ids: string[] }   // quem está no MEU raio agora (delta ok)
-chat        { fromId, displayName, avatarRef, text, ts }  // SÓ se em raio; não salvo
-correction  { cellX, cellY, seq }                         // se predição divergiu
-pong        {}
+AmbienteRoom.state (Schema):
+  players: MapSchema<PlayerState>
+PlayerState:
+  id          string   // sessionId
+  userId      string
+  displayName string
+  cellX       int
+  cellY       int
+  dir         'up'|'down'|'left'|'right'
+  // avatar (32 bytes bits + color) enviado 1x no onJoin via mensagem,
+  // não vai no Schema (não muda durante a sessão)
 ```
 
-> **Roteamento por proximidade**: o servidor calcula, por jogador, o conjunto de
-> jogadores dentro do raio `CHAT_RADIUS` (distância em células — ver §9) e:
-> 1. relaya cada `chat` **apenas** para os destinatários em raio do remetente;
-> 2. emite `nearby` quando esse conjunto muda (entrou/saiu alguém do alcance),
->    para alimentar a barra inferior de "quem está ouvindo".
+- **Movimento autoritativo**: cliente envia a *intenção* `move`; o servidor
+  valida no `onMessage` (adjacência, limites, colisão) e, se válido, atualiza
+  `PlayerState` — o state-sync do Colyseus propaga o patch a todos na sala.
+- **Tick**: o `setSimulationInterval` da Room roda a ~10–15 Hz; movimento
+  enfileirado é resolvido por tick (evita flood de patches).
+- **Predição/reconciliação**: cliente prediz o passo e corrige se o estado
+  sincronizado divergir (raro em grid-based). Interpolação suaviza o render.
 
-> **`ws` cru + loop próprio** dá controle total e footprint mínimo (preferido
-> para o free tier). **Colyseus** é a alternativa se quisermos sincronização de
-> estado/salas prontas — decisão a confirmar antes de codar o servidor.
+### Chat e proximidade — mensagens (NÃO entram no Schema)
+
+Chat é **efêmero** e **escopado por proximidade**, então **não** vai no `Schema`
+(que é persistente/sincronizado): é tratado como **mensagem de sala** roteada à
+mão — exatamente o controle que queríamos.
+
+- `room.onMessage("chat", ...)`: servidor calcula quem está no raio do remetente
+  (círculo Euclidiano, `chat_radius` da sala) e faz `client.send("chat", ...)`
+  **só** para esses `clients` (incluindo o remetente). Quem está fora não recebe.
+- **`nearby`**: a cada tick (ou quando o conjunto muda), o servidor envia a cada
+  cliente a lista de quem está no seu raio, para a barra de ouvintes ("+X").
+
+### Mensagens (tipos em `packages/shared`, validados com zod)
+
+Client → Server (`room.send`):
+```
+move   { dir: 'up'|'down'|'left'|'right', seq }   // intenção
+chat   { text }                                   // efêmero
+```
+Server → Client (`client.send` / state patches):
+```
+[state patch]  players: MapSchema<PlayerState>     // automático (Colyseus)
+init           { ambiente: {meta, art, collision, spawn, chatRadius}, you }  // onJoin
+avatar         { id, bits, color, displayName }    // 1x por player ao entrar
+nearby         { ids: string[] }                   // quem está no MEU raio agora
+chat           { fromId, displayName, text, ts }   // SÓ se em raio; não salvo
+correction     { cellX, cellY, seq }               // se a predição divergiu
+```
+
+> O join/leave de jogadores é observado pelos clientes via mudanças no
+> `MapSchema<PlayerState>` (callbacks `onAdd`/`onRemove` do Colyseus) — não
+> precisamos de mensagens `playerJoin/playerLeave` explícitas.
+
+### Escala (motivação da escolha)
+
+- **Vertical primeiro**: um processo Colyseus no free tier ARM aguenta muitas
+  salas pequenas.
+- **Horizontal depois**: trocar o driver para **Redis** (`RedisPresence` +
+  `RedisDriver`) permite **N processos/instâncias** com matchmaking
+  compartilhado, sem mudar a lógica de `AmbienteRoom`. Reverse proxy faz o
+  sticky/route por sala. A persistência (Postgres) já é externa e compartilhada,
+  e o chat é em memória por sala — nada disso impede o scale-out.
 
 ---
 
@@ -406,7 +436,8 @@ efêmero/seguro: a mensagem nem chega a quem está fora do raio.
 | 6 | **Emotes/balões de fala** sobre o avatar no mapa | Liga chat ↔ mundo. |
 | 7 | **Editor: undo/redo, zoom, layers nomeadas** | Qualidade de criação. |
 | 8 | **Reconexão suave** (retomar posição persistida) | Já temos `player_positions`. |
-| 9 | **Limite de jogadores por sala** + fila | Protege o free tier. |
+| 9 | **Limite de jogadores por sala** + fila (matchmaking Colyseus) | Protege o free tier. |
+| 11 | **Scale-out** com driver Redis (`RedisPresence`/`RedisDriver`) | Vários processos Colyseus sem reescrever salas (§7). |
 | 10 | **Sprite procedural** com mais estilos (paletas temáticas) | Onboarding divertido. |
 
 Sugiro tratar **#1, #3, #5, #8** como parte natural do MVP estendido; o resto
@@ -417,13 +448,14 @@ como backlog.
 ## 12. Roadmap / milestones
 
 - **M0 — Fundação**: monorepo, `shared` (tipos + protocolo zod), lint/format,
-  Fastify hello, Vite app, schema DB + migrations.
+  Fastify hello, Vite app, **Colyseus server vazio** (1 Room de teste), schema
+  Postgres + migrations.
 - **M1 — Auth & Avatar**: Google OAuth + guest; editor 16×16 + gerador
   aleatório; persistir avatar.
 - **M2 — Servidores & Editor de mapa**: CRUD de servidor/ambiente; editor de
   arte (lápis/borracha/balde) + editor de colisão + spawn; salvar/carregar.
-- **M3 — Realtime autoritativo**: WS, salas, join, movimento grid-based
-  validado, broadcast por tick, interpolação no cliente.
+- **M3 — Realtime autoritativo**: `AmbienteRoom` (Colyseus), join, `PlayerState`
+  Schema, movimento grid-based validado por tick, interpolação no cliente.
 - **M4 — Chat efêmero + proximidade**: relay seguro **por raio**, cálculo de
   `nearby`, barra de ouvintes ("+X"), miniatura de avatar, handler de teclado
   (setas vs. digitação), rate limit.
@@ -437,7 +469,7 @@ como backlog.
 
 ## 13. Perguntas em aberto (para a próxima rodada)
 
-1. **Realtime**: `ws` cru (controle/footprint) **ou** Colyseus (produtividade)?
+1. ~~Realtime~~ → **Colyseus** (decidido; escala via Redis depois).
 2. ~~DB~~ → **PostgreSQL** (decidido, a partir do M0).
 3. **Tamanho de mundo**: limite fixo (ex.: 64×64 células = 1024×1024 px) ou
    configurável pelo host? Há limite de banda/armazenamento desejado?
