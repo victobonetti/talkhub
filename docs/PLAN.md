@@ -53,7 +53,7 @@ talkhub/
 | Estado client | Zustand | Leve, sem boilerplate. |
 | Back HTTP | Fastify | Performático, TS-first, leve em ARM. |
 | Realtime | `ws` (WebSocket cru) + game loop próprio **ou** Colyseus | Autoritativo. Colyseus já traz salas/sincronização de estado; `ws` dá controle total. Ver §7. |
-| DB | PostgreSQL (Prisma ou Drizzle) | Robusto; SQLite é alternativa válida p/ começar. Roda bem no free tier. |
+| DB | **PostgreSQL** (Prisma ou Drizzle) | **Decidido** a partir do M0. Robusto, roda bem no free tier ARM. |
 | Auth | Google OAuth 2.0 (OIDC) + JWT próprio p/ sessão e guest | Sem dependência de auth gerenciado. |
 
 > Tudo escolhido para rodar num único host ARM atrás de um reverse proxy com
@@ -301,9 +301,9 @@ efêmero/seguro: a mensagem nem chega a quem está fora do raio.
 
 - **Raio**: `chat_radius` em **células**, **definido pelo host no editor do
   servidor** (controle interativo com pré-visualização do círculo — ver §8).
-  Default sugerido: **5 células** ≈ 80px. Distância de **Chebyshev** (quadrado)
-  ou **Euclidiana** (círculo) — recomendo círculo (Euclidiana) por ser mais
-  intuitivo e bater com o preview circular do editor. A definir no §13.
+  Default sugerido: **5 células** ≈ 80px. **Forma: círculo (distância
+  Euclidiana)** — `dx² + dy² ≤ chat_radius²` (decidido), batendo com o preview
+  circular do editor.
 - **Roteamento autoritativo** (servidor): ao receber um `chat`, calcula os
   jogadores dentro do raio do remetente e relaya **só para eles** (incluindo o
   próprio remetente). Quem está fora **não recebe** a mensagem.
@@ -390,13 +390,12 @@ como backlog.
 ## 13. Perguntas em aberto (para a próxima rodada)
 
 1. **Realtime**: `ws` cru (controle/footprint) **ou** Colyseus (produtividade)?
-2. **DB**: PostgreSQL **ou** SQLite para começar (menos infra no free tier)?
+2. ~~DB~~ → **PostgreSQL** (decidido, a partir do M0).
 3. **Tamanho de mundo**: limite fixo (ex.: 64×64 células = 1024×1024 px) ou
    configurável pelo host? Há limite de banda/armazenamento desejado?
 4. **Multi-ambiente** entra no MVP ou fica como fase 2?
-8. **Proximidade**: raio é configurável pelo host no editor (decidido). Falta:
-   forma (círculo Euclidiano vs. quadrado Chebyshev) e o valor **default** /
-   limites min–max do slider.
+8. **Proximidade**: raio configurável pelo host, **forma círculo Euclidiano**
+   (decidido). Falta só o valor **default** / limites min–max do slider.
 5. **E2E** do chat: MVP ou backlog? (afeta moderação)
 6. **Idioma do código/UI**: PT-BR, EN, ou i18n desde o início?
 7. **Moderação/abuso**: precisamos de report/ban no MVP, ou só rate limit?
