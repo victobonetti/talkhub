@@ -107,7 +107,7 @@ avatars
   user_id       uuid pk fk->users
   -- sprite 16x16 MONOCROMÁTICO: 1 bit/pixel = 256 bits = 32 bytes (ver §6)
   bits          bytea            -- exatamente 32 bytes (silhueta on/off)
-  color         text null        -- cor única de exibição (opcional; a definir)
+  color         text not null    -- cor única de exibição do avatar (hex)
   updated_at    timestamptz
 
 servers            -- "Hub"
@@ -154,8 +154,8 @@ portais (melhoria)
 
 1. **Login** — botão "Entrar com Google" e "Entrar como convidado".
 2. **Criação/edição de avatar** — editor 16×16 **monocromático** (lápis/borracha
-   /balde, pixels on/off, sem paleta) e botão **"Gerar aleatório"** (silhueta
-   procedural simétrica). Salva no user.
+   /balde, pixels on/off) + **seletor de uma cor única** de exibição, e botão
+   **"Gerar aleatório"** (silhueta procedural simétrica). Salva no user.
 3. **Lista de servidores ativos** — cards com nome, nº de jogadores online,
    preview do mapa. Botões: *Entrar* / *Criar servidor*.
 4. **Criar servidor** — nome + **editor de mapa** (§8).
@@ -183,19 +183,21 @@ O personagem desenhado pelo jogador é **monocor**: cada pixel é apenas
 
 - **Representação**: bitmap **1 bit por pixel** → 256 bits = **32 bytes**.
   Extremamente compacto (cabe num `BIGINT[4]` ou `bytea(32)`/base64 de 44 chars).
-- **Cor de render é do tema/cliente**, não do dado: o servidor guarda só a
-  silhueta (on/off). O cliente pinta com a cor do tema (ex.: foreground sobre
-  fundo transparente). Opcional: um único campo `color` por usuário se quisermos
-  permitir escolher a cor de exibição — **a definir** (não altera o "monocor",
-  só a cor única de pintura).
+- **Cor única de exibição (por usuário)**: o sprite é monocor, mas cada usuário
+  escolhe **uma cor** para pintar a silhueta. O dado guarda os 32 bytes (on/off)
+  **+ um campo `color`** (hex) com a cor escolhida. Os pixels ligados são
+  pintados nessa cor; os desligados ficam transparentes. Continua "monocor" — é
+  uma só cor por avatar, definida pelo dono (não pelo tema do cliente).
 - **Editor**: grade 16×16 com toggle de pixel; ferramentas **lápis** (liga),
-  **borracha** (desliga) e **balde** (flood fill liga/desliga). Sem seletor de
-  cor — só preto/branco lógico (on/off).
+  **borracha** (desliga) e **balde** (flood fill liga/desliga). Há um **seletor
+  de cor única** (um swatch/color picker) que define a cor de exibição do avatar
+  inteiro — não é por pixel, é a cor do personagem.
 - **Gerador aleatório**: liga pixels numa metade e **espelha horizontalmente**
   (estilo identicon) → silhuetas simétricas e únicas, com densidade controlada.
-- **Miniatura no chat e barra de ouvintes**: o cliente tem os 32 bytes; renderiza
-  num `<canvas>` 16×16 escalado com `image-rendering: pixelated`, pintando os
-  pixels ligados na cor do tema. Sem custo de rede extra.
+- **Miniatura no chat e barra de ouvintes**: o cliente tem os 32 bytes + a
+  `color`; renderiza num `<canvas>` 16×16 escalado com `image-rendering:
+  pixelated`, pintando os pixels ligados na cor única do usuário. Sem custo de
+  rede extra.
 
 ---
 
