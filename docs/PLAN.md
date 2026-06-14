@@ -452,8 +452,10 @@ como backlog.
   Vite app, **Colyseus** `AmbienteRoom` (join/leave + relay de chat placeholder),
   **Prisma schema** Postgres. (Migration roda quando `DATABASE_URL` estiver
   configurada.) Verificado end-to-end: client conecta, state-sync e chat relay.
-- **M1 — Auth & Avatar**: Google OAuth + guest; editor 16×16 + gerador
-  aleatório; persistir avatar.
+- **M1 — Auth & Avatar** ✅: login convidado (JWT) + fluxo Google OAuth
+  estruturado (ativa via env); API de avatar (`GET/PUT /avatar/me`); editor
+  16×16 monocromático (lápis/borracha/balde + cor única) + gerador aleatório,
+  persistindo no Postgres. Verificado end-to-end contra Postgres real.
 - **M2 — Servidores & Editor de mapa**: CRUD de servidor/ambiente; editor de
   arte (lápis/borracha/balde) + editor de colisão + spawn; salvar/carregar.
 - **M3 — Realtime autoritativo**: `AmbienteRoom` (Colyseus), join, `PlayerState`

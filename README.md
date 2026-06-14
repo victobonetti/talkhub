@@ -6,9 +6,10 @@ conversam num chat lateral efêmero.
 
 ## Status
 
-Em desenvolvimento — **M0 (fundação)** concluído: scaffold do monorepo,
-realtime com Colyseus e schema Postgres. Veja a especificação técnica do MVP em
-[`docs/PLAN.md`](docs/PLAN.md) e o roadmap na §12.
+Em desenvolvimento — **M0 (fundação)** e **M1 (auth & avatar)** concluídos:
+scaffold do monorepo, realtime com Colyseus, schema Postgres, login
+convidado/Google e editor de avatar 16×16. Veja a especificação técnica do MVP
+em [`docs/PLAN.md`](docs/PLAN.md) e o roadmap na §12.
 
 ## Stack
 

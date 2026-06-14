@@ -15,6 +15,7 @@
     "@colyseus/core": "^0.16.0",
     "@colyseus/ws-transport": "^0.16.0",
     "@fastify/cors": "^10.0.2",
+    "@fastify/jwt": "^9.0.3",
     "@prisma/client": "^6.2.1",
     "@talkhub/shared": "*",
     "fastify": "^5.2.1",
