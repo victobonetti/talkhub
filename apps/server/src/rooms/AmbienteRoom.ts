@@ -54,6 +54,8 @@ export class AmbienteRoom extends Room<AmbienteState> {
   private intents = new Map<string, { dir: Dir; seq: number }>();
   /** último conjunto `nearby` enviado por sessão (para enviar só em mudança). */
   private lastNearby = new Map<string, string>();
+  /** timestamps recentes de chat por sessão (rate limit). */
+  private chatTimes = new Map<string, number[]>();
 
   async onCreate(options: JoinOpts): Promise<void> {
     const a = options.ambienteId
@@ -85,6 +87,7 @@ export class AmbienteRoom extends Room<AmbienteState> {
       if (!parsed.success) return;
       const sender = this.state.players.get(client.sessionId);
       if (!sender) return;
+      if (this.rateLimited(client.sessionId)) return;
       const payload: ChatPayload = {
         fromId: client.sessionId,
         displayName: sender.displayName,
@@ -176,6 +179,7 @@ export class AmbienteRoom extends Room<AmbienteState> {
     this.avatars.delete(client.sessionId);
     this.intents.delete(client.sessionId);
     this.lastNearby.delete(client.sessionId);
+    this.chatTimes.delete(client.sessionId);
   }
 
   private inBounds(x: number, y: number): boolean {
@@ -183,6 +187,19 @@ export class AmbienteRoom extends Room<AmbienteState> {
   }
   private blocked(x: number, y: number): boolean {
     return isBlocked(this.collision, x, y, this.wCells);
+  }
+
+  /** Rate limit simples: no máx. 6 mensagens por janela de 4s por sessão. */
+  private rateLimited(sessionId: string): boolean {
+    const now = Date.now();
+    const times = (this.chatTimes.get(sessionId) ?? []).filter((t) => now - t < 4000);
+    if (times.length >= 6) {
+      this.chatTimes.set(sessionId, times);
+      return true;
+    }
+    times.push(now);
+    this.chatTimes.set(sessionId, times);
+    return false;
   }
 
   /** true se `b` está dentro do raio de chat de `a` (círculo Euclidiano, em células). */

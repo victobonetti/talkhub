@@ -472,11 +472,13 @@ como backlog.
   com "+X", miniatura de avatar nas mensagens, handler de teclado (setas movem,
   demais teclas digitam, Enter envia). Verificado: perto recebe, longe não;
   `nearby` atualiza ao andar. (Rate limit fica para o M6.)
-- **M5 — Game view & responsivo**: split 50/50 desktop, split vertical + D-pad
-  mobile, barra de ouvintes no rodapé, lista de servidores com preview e
-  presença.
-- **M6 — Melhorias**: portais/multi-ambiente, reconexão com posição salva,
-  (opcional) E2E, balões de fala e destaque de raio.
+- **M5 — Game view & responsivo** ✅: split horizontal no desktop, **split
+  vertical + D-pad** no mobile, barra de ouvintes no rodapé, lista de servidores
+  com **preview do mapa e presença** (online por servidor via matchMaker).
+- **M6 — Melhorias** (em andamento): ✅ balões de fala, ✅ destaque do raio,
+  ✅ rate limit de chat, ✅ reconexão com posição salva (do M3); **portais /
+  multi-ambiente** (backend + traversal) — ver abaixo; E2E opcional fica como
+  backlog.
 
 ---
 

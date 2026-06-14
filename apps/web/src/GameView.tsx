@@ -64,6 +64,33 @@ function buildAvatarCanvas(av: AvatarPayload): HTMLCanvasElement {
   return cv;
 }
 
+/** Controle direcional na tela (mobile). */
+function DPad({ onMove }: { onMove: (dir: Dir) => void }) {
+  const btn: React.CSSProperties = {
+    width: 52,
+    height: 52,
+    fontSize: 22,
+    borderRadius: 8,
+    border: "1px solid #bbb",
+    background: "#fff",
+    touchAction: "none",
+  };
+  const press = (dir: Dir) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    onMove(dir);
+  };
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 52px)", gap: 6, justifyContent: "center", marginTop: 8 }}>
+      <span />
+      <button style={btn} onPointerDown={press("up")}>↑</button>
+      <span />
+      <button style={btn} onPointerDown={press("left")}>←</button>
+      <button style={btn} onPointerDown={press("down")}>↓</button>
+      <button style={btn} onPointerDown={press("right")}>→</button>
+    </div>
+  );
+}
+
 function AvatarThumb({ payload, size = 22 }: { payload?: AvatarPayload; size?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -92,18 +119,31 @@ export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: (
   const [messages, setMessages] = useState<ChatLine[]>([]);
   const [nearby, setNearby] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
+  const [myId, setMyId] = useState("");
+  const [vw, setVw] = useState(() => window.innerWidth);
 
   const mapCanvas = useRef<HTMLCanvasElement>(null);
   const playersCanvas = useRef<HTMLCanvasElement>(null);
   const roomRef = useRef<Room | null>(null);
   const avatarCache = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const disp = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const bubbles = useRef<Map<string, { text: string; until: number }>>(new Map());
   const seq = useRef(0);
   const msgKey = useRef(0);
 
+  const isMobile = vw < 768;
   const wpx = meta ? meta.wCells * CELL_SIZE : 0;
   const hpx = meta ? meta.hCells * CELL_SIZE : 0;
-  const scale = meta ? Math.max(1, Math.min(8, Math.floor(560 / wpx))) : 1;
+  const maxW = isMobile ? vw - 32 : 560;
+  const scale = meta ? Math.max(1, Math.min(8, Math.floor(maxW / wpx))) : 1;
+
+  useEffect(() => {
+    const onResize = () => setVw(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const sendMove = (dir: Dir) => roomRef.current?.send("move", { dir, seq: seq.current++ });
 
   useEffect(() => {
     let active = true;
@@ -126,9 +166,10 @@ export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: (
       });
       room.onMessage("chat", (m: ChatPayload) => {
         setMessages((prev) => [...prev.slice(-49), { ...m, key: msgKey.current++ }]);
+        bubbles.current.set(m.fromId, { text: m.text, until: Date.now() + 4000 });
       });
       room.onMessage("nearby", (m: { ids: string[] }) => setNearby(m.ids));
-      room.onMessage("init", () => {});
+      room.onMessage("init", (m: { you: string }) => setMyId(m.you));
       room.onMessage("correction", () => {});
     })().catch((e: unknown) => {
       if (active) setStatus(`erro: ${e instanceof Error ? e.message : String(e)}`);
@@ -171,7 +212,7 @@ export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: (
       const dir = KEY_DIR[e.key];
       if (dir) {
         e.preventDefault();
-        roomRef.current?.send("move", { dir, seq: seq.current++ });
+        sendMove(dir);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -189,6 +230,26 @@ export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: (
         const ctx = cv.getContext("2d")!;
         ctx.clearRect(0, 0, cv.width, cv.height);
         const players = room.state.players as Map<string, PlayerView>;
+        const now = Date.now();
+
+        // destaque do meu raio de chat (sob os jogadores)
+        const mine = myId ? disp.current.get(myId) : undefined;
+        if (mine && meta) {
+          ctx.beginPath();
+          ctx.arc(
+            (mine.x + CELL_SIZE / 2) * scale,
+            (mine.y + CELL_SIZE / 2) * scale,
+            meta.chatRadius * CELL_SIZE * scale,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fillStyle = "rgba(40,110,240,0.06)";
+          ctx.fill();
+          ctx.strokeStyle = "rgba(40,110,240,0.25)";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
+
         players.forEach((p: PlayerView, id: string) => {
           const tx = p.cellX * CELL_SIZE;
           const ty = p.cellY * CELL_SIZE;
@@ -207,13 +268,31 @@ export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: (
           ctx.fillStyle = "#000";
           ctx.font = "10px sans-serif";
           ctx.fillText(p.displayName, d.x * scale, d.y * scale - 2);
+
+          // balão de fala (acima do avatar)
+          const bubble = bubbles.current.get(id);
+          if (bubble && bubble.until > now) {
+            const text = bubble.text.length > 40 ? bubble.text.slice(0, 39) + "…" : bubble.text;
+            ctx.font = "11px sans-serif";
+            const w = ctx.measureText(text).width + 10;
+            const cx = d.x * scale + (CELL_SIZE * scale) / 2;
+            const bx = Math.max(0, cx - w / 2);
+            const by = d.y * scale - 20;
+            ctx.fillStyle = "rgba(255,255,255,0.95)";
+            ctx.strokeStyle = "#bbb";
+            ctx.lineWidth = 1;
+            ctx.fillRect(bx, by, w, 16);
+            ctx.strokeRect(bx, by, w, 16);
+            ctx.fillStyle = "#000";
+            ctx.fillText(text, bx + 5, by + 12);
+          }
         });
       }
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [meta, scale]);
+  }, [meta, scale, myId]);
 
   const send = () => {
     const text = draft.trim();
@@ -232,7 +311,14 @@ export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: (
         <span style={{ fontSize: 12, color: "#999" }}>setas = andar · digite e Enter = falar</span>
       </div>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          alignItems: "flex-start",
+          flexDirection: isMobile ? "column" : "row",
+        }}
+      >
         {/* Mapa + barra de ouvintes */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ position: "relative", width: wpx * scale, height: hpx * scale }}>
@@ -263,10 +349,20 @@ export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: (
             ))}
             {extra > 0 && <span style={{ fontSize: 13, fontWeight: 700 }}>+{extra}</span>}
           </div>
+          {isMobile && <DPad onMove={sendMove} />}
         </div>
 
         {/* Chat */}
-        <div style={{ flex: 1, minWidth: 260, display: "flex", flexDirection: "column", height: hpx * scale }}>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 260,
+            alignSelf: "stretch",
+            display: "flex",
+            flexDirection: "column",
+            height: isMobile ? 280 : hpx * scale,
+          }}
+        >
           <div
             style={{
               flex: 1,

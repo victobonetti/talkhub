@@ -101,6 +101,10 @@ export interface ServerListItem {
   name: string;
   ownerName: string;
   ambienteCount: number;
+  /** jogadores online no servidor (soma das salas ativas). */
+  playerCount: number;
+  /** primeiro ambiente (para preview e entrada rápida). */
+  firstAmbienteId: string | null;
   createdAt: string;
 }
 

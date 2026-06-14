@@ -1,12 +1,29 @@
 import type { FastifyInstance } from "fastify";
+import { matchMaker } from "@colyseus/core";
 import {
   CELL_SIZE,
+  ROOM_AMBIENTE,
   ServerCreateSchema,
   type AmbienteFullDto,
   type AmbienteMetaDto,
   type ServerListItem,
 } from "@talkhub/shared";
 import { prisma } from "../db.js";
+
+/** Conta jogadores online por ambienteId consultando as salas ativas do Colyseus. */
+async function onlineByAmbiente(): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  try {
+    const rooms = await matchMaker.query({ name: ROOM_AMBIENTE });
+    for (const r of rooms) {
+      const aid = (r.metadata as { ambienteId?: string } | undefined)?.ambienteId;
+      if (aid) counts.set(aid, (counts.get(aid) ?? 0) + (r.clients ?? 0));
+    }
+  } catch {
+    /* matchMaker indisponível: retorna zeros */
+  }
+  return counts;
+}
 
 function metaDto(a: {
   id: string;
@@ -56,18 +73,24 @@ export async function serverRoutes(app: FastifyInstance): Promise<void> {
     return { id: server.id, ambienteId: server.ambientes[0]?.id };
   });
 
-  // Listar servidores públicos.
+  // Listar servidores públicos (com presença e primeiro ambiente p/ preview).
   app.get("/servers", async () => {
     const servers = await prisma.server.findMany({
       where: { isPublic: true },
       orderBy: { createdAt: "desc" },
-      include: { owner: { select: { displayName: true } }, _count: { select: { ambientes: true } } },
+      include: {
+        owner: { select: { displayName: true } },
+        ambientes: { select: { id: true }, orderBy: { createdAt: "asc" } },
+      },
     });
+    const online = await onlineByAmbiente();
     const items: ServerListItem[] = servers.map((s) => ({
       id: s.id,
       name: s.name,
       ownerName: s.owner.displayName,
-      ambienteCount: s._count.ambientes,
+      ambienteCount: s.ambientes.length,
+      playerCount: s.ambientes.reduce((sum, a) => sum + (online.get(a.id) ?? 0), 0),
+      firstAmbienteId: s.ambientes[0]?.id ?? null,
       createdAt: s.createdAt.toISOString(),
     }));
     return { servers: items };

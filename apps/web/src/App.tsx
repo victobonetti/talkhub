@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
-import type { PublicUser, ServerListItem } from "@talkhub/shared";
+import { useEffect, useRef, useState } from "react";
+import { CELL_SIZE, type PublicUser, type ServerListItem } from "@talkhub/shared";
+import { base64ToBytes } from "@talkhub/shared";
 import {
   captureTokenFromHash,
   clearToken,
+  getAmbiente,
   getMe,
-  getServer,
   getToken,
   googleAvailable,
   googleLoginHref,
@@ -44,10 +45,8 @@ export function App() {
     setView({ name: "list" });
   };
 
-  const enterServer = async (serverId: string) => {
-    const detail = await getServer(serverId);
-    const first = detail.ambientes[0];
-    if (first) setView({ name: "game", ambienteId: first.id });
+  const enterServer = (ambienteId: string | null) => {
+    if (ambienteId) setView({ name: "game", ambienteId });
   };
 
   if (loading) return <Shell>Carregando…</Shell>;
@@ -106,7 +105,7 @@ function ServerList({
 }: {
   onCreate: () => void;
   onEditAvatar: () => void;
-  onEnter: (serverId: string) => void;
+  onEnter: (ambienteId: string | null) => void;
 }) {
   const [servers, setServers] = useState<ServerListItem[] | null>(null);
 
@@ -130,22 +129,95 @@ function ServerList({
       ) : servers.length === 0 ? (
         <p>Nenhum servidor ainda. Crie o primeiro!</p>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 8 }}>
+        <ul
+          style={{
+            listStyle: "none",
+            padding: 0,
+            display: "grid",
+            gap: 12,
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+          }}
+        >
           {servers.map((s) => (
             <li
               key={s.id}
-              onClick={() => onEnter(s.id)}
-              style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, cursor: "pointer" }}
+              onClick={() => onEnter(s.firstAmbienteId)}
+              style={{
+                border: "1px solid #ddd",
+                borderRadius: 8,
+                padding: 12,
+                cursor: "pointer",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
             >
-              <strong>{s.name}</strong>
-              <div style={{ fontSize: 13, color: "#666" }}>
-                por {s.ownerName} · {s.ambienteCount} ambiente(s) · clique para entrar
+              {s.firstAmbienteId && <ServerPreview ambienteId={s.firstAmbienteId} />}
+              <div>
+                <strong>{s.name}</strong>
+                <div style={{ fontSize: 13, color: "#666" }}>por {s.ownerName}</div>
+                <div style={{ fontSize: 12, color: s.playerCount > 0 ? "#1a8a3a" : "#999" }}>
+                  ● {s.playerCount} online · {s.ambienteCount} ambiente(s)
+                </div>
               </div>
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+/** Miniatura do mapa do primeiro ambiente de um servidor. */
+function ServerPreview({ ambienteId }: { ambienteId: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    let active = true;
+    getAmbiente(ambienteId)
+      .then((a) => {
+        if (!active || !ref.current) return;
+        const wpx = a.wCells * CELL_SIZE;
+        const hpx = a.hCells * CELL_SIZE;
+        const cv = ref.current;
+        cv.width = wpx;
+        cv.height = hpx;
+        const ctx = cv.getContext("2d")!;
+        const idx = base64ToBytes(a.art);
+        const img = ctx.createImageData(wpx, hpx);
+        for (let i = 0; i < idx.length; i++) {
+          const v = idx[i];
+          const o = i * 4;
+          if (v === 0) {
+            img.data[o] = img.data[o + 1] = img.data[o + 2] = 240;
+            img.data[o + 3] = 255;
+          } else {
+            const hex = a.palette[v - 1] ?? "#000000";
+            img.data[o] = parseInt(hex.slice(1, 3), 16);
+            img.data[o + 1] = parseInt(hex.slice(3, 5), 16);
+            img.data[o + 2] = parseInt(hex.slice(5, 7), 16);
+            img.data[o + 3] = 255;
+          }
+        }
+        ctx.putImageData(img, 0, 0);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [ambienteId]);
+  return (
+    <canvas
+      ref={ref}
+      style={{
+        width: "100%",
+        height: 90,
+        objectFit: "contain",
+        imageRendering: "pixelated",
+        background: "#fafafa",
+        border: "1px solid #eee",
+        borderRadius: 4,
+      }}
+    />
   );
 }
 
