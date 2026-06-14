@@ -54,7 +54,7 @@ talkhub/
 | Estado client | Zustand | Leve, sem boilerplate. |
 | Back HTTP | Fastify | Performático, TS-first, leve em ARM. |
 | Realtime | **Colyseus** (game server autoritativo, salas) | **Decidido.** Salas, state-sync binário, reconexão e **escala horizontal** (driver Redis + presence) prontos. Ver §7. |
-| DB | **PostgreSQL** (Prisma ou Drizzle) | **Decidido** a partir do M0. Robusto, roda bem no free tier ARM. |
+| DB | **PostgreSQL** + **Prisma** (ORM) | **Decidido.** Robusto, roda bem no free tier ARM; Prisma dá migrations versionadas e tipos gerados. |
 | Auth | Google OAuth 2.0 (OIDC) + JWT próprio p/ sessão e guest | Sem dependência de auth gerenciado. |
 
 > Tudo escolhido para rodar num único host ARM atrás de um reverse proxy com
@@ -448,8 +448,8 @@ como backlog.
 ## 12. Roadmap / milestones
 
 - **M0 — Fundação**: monorepo, `shared` (tipos + protocolo zod), lint/format,
-  Fastify hello, Vite app, **Colyseus server vazio** (1 Room de teste), schema
-  Postgres + migrations.
+  Fastify hello, Vite app, **Colyseus server vazio** (1 Room de teste), **Prisma
+  schema** Postgres + migration inicial.
 - **M1 — Auth & Avatar**: Google OAuth + guest; editor 16×16 + gerador
   aleatório; persistir avatar.
 - **M2 — Servidores & Editor de mapa**: CRUD de servidor/ambiente; editor de
