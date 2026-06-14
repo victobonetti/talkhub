@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.github
+*.log
+.env
+.env.*
+**/.env
+**/.env.*
+*.tsbuildinfo
+coverage
+.DS_Store

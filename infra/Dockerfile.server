@@ -1,0 +1,32 @@
+# Talkhub server (Fastify REST + Colyseus WSS na mesma porta).
+# Processo Node de vida longa — NÃO é serverless. Roda atrás do Caddy do 4q.
+# Build context = raiz do monorepo. Imagem inclui o Prisma CLI + migrations
+# para permitir `prisma migrate deploy` no deploy.
+FROM node:20-bookworm-slim
+
+WORKDIR /app
+
+# openssl é exigido pelo engine do Prisma em runtime.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# Monorepo inteiro (node_modules/dist ficam de fora via .dockerignore).
+COPY . .
+
+# Instala workspaces, gera o Prisma Client e builda shared -> server.
+# (web não é necessário nesta imagem; é servido pela imagem talkhub-web.)
+RUN npm ci \
+ && npm run prisma:generate -w @talkhub/server \
+ && npm run build -w @talkhub/shared \
+ && npm run build -w @talkhub/server
+
+ENV NODE_ENV=production
+ENV HOST=0.0.0.0
+ENV PORT=2567
+
+# Porta interna apenas — exposta ao Caddy pela rede Docker, nunca publicada.
+EXPOSE 2567
+
+# Entry do server a partir da raiz do repo (resolve @talkhub/shared via workspace).
+CMD ["node", "apps/server/dist/index.js"]
