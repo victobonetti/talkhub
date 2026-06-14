@@ -6,12 +6,12 @@ conversam num chat lateral efêmero.
 
 ## Status
 
-Em desenvolvimento — **M0–M3** concluídos: scaffold do monorepo, realtime
+Em desenvolvimento — **M0–M4** concluídos: scaffold do monorepo, realtime
 autoritativo com Colyseus (movimento grid-based validado por colisão + game view
-com avatares andando), schema Postgres, login convidado/Google, editor de avatar
-16×16 e editor de mapa (arte + colisão + spawn + raio) com lista de servidores.
-Veja a especificação técnica do MVP em [`docs/PLAN.md`](docs/PLAN.md) e o roadmap
-na §12.
+com avatares andando), **chat efêmero por proximidade** (raio circular, barra de
+ouvintes "+X"), schema Postgres, login convidado/Google, editor de avatar 16×16
+e editor de mapa (arte + colisão + spawn + raio) com lista de servidores. Veja a
+especificação técnica do MVP em [`docs/PLAN.md`](docs/PLAN.md) e o roadmap na §12.
 
 ## Stack
 

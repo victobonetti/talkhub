@@ -467,9 +467,11 @@ como backlog.
   avatares; game view no cliente renderiza o mapa + avatares andando com
   interpolação (setas movem). Verificado end-to-end (bloqueio, persistência,
   rejeição de auth).
-- **M4 — Chat efêmero + proximidade**: relay seguro **por raio**, cálculo de
-  `nearby`, barra de ouvintes ("+X"), miniatura de avatar, handler de teclado
-  (setas vs. digitação), rate limit.
+- **M4 — Chat efêmero + proximidade** ✅: relay de chat só para quem está no raio
+  (círculo Euclidiano), cálculo de `nearby` enviado em mudança, barra de ouvintes
+  com "+X", miniatura de avatar nas mensagens, handler de teclado (setas movem,
+  demais teclas digitam, Enter envia). Verificado: perto recebe, longe não;
+  `nearby` atualiza ao andar. (Rate limit fica para o M6.)
 - **M5 — Game view & responsivo**: split 50/50 desktop, split vertical + D-pad
   mobile, barra de ouvintes no rodapé, lista de servidores com preview e
   presença.

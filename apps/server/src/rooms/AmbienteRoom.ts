@@ -52,6 +52,8 @@ export class AmbienteRoom extends Room<AmbienteState> {
   private avatars = new Map<string, AvatarPayload>();
   /** última intenção de movimento pendente por sessão. */
   private intents = new Map<string, { dir: Dir; seq: number }>();
+  /** último conjunto `nearby` enviado por sessão (para enviar só em mudança). */
+  private lastNearby = new Map<string, string>();
 
   async onCreate(options: JoinOpts): Promise<void> {
     const a = options.ambienteId
@@ -83,14 +85,18 @@ export class AmbienteRoom extends Room<AmbienteState> {
       if (!parsed.success) return;
       const sender = this.state.players.get(client.sessionId);
       if (!sender) return;
-      // M4: filtrar por proximidade (raio = this.chatRadius).
       const payload: ChatPayload = {
         fromId: client.sessionId,
         displayName: sender.displayName,
         text: parsed.data.text,
         ts: Date.now(),
       };
-      this.broadcast(ServerMessage.Chat, payload);
+      // Relay efêmero APENAS para quem está no raio do remetente (inclui ele).
+      for (const c of this.clients) {
+        if (c.sessionId === client.sessionId || this.withinRadius(client.sessionId, c.sessionId)) {
+          c.send(ServerMessage.Chat, payload);
+        }
+      }
     });
   }
 
@@ -169,6 +175,7 @@ export class AmbienteRoom extends Room<AmbienteState> {
     this.sessions.delete(client.sessionId);
     this.avatars.delete(client.sessionId);
     this.intents.delete(client.sessionId);
+    this.lastNearby.delete(client.sessionId);
   }
 
   private inBounds(x: number, y: number): boolean {
@@ -176,6 +183,33 @@ export class AmbienteRoom extends Room<AmbienteState> {
   }
   private blocked(x: number, y: number): boolean {
     return isBlocked(this.collision, x, y, this.wCells);
+  }
+
+  /** true se `b` está dentro do raio de chat de `a` (círculo Euclidiano, em células). */
+  private withinRadius(a: string, b: string): boolean {
+    const pa = this.state.players.get(a);
+    const pb = this.state.players.get(b);
+    if (!pa || !pb) return false;
+    const dx = pa.cellX - pb.cellX;
+    const dy = pa.cellY - pb.cellY;
+    return dx * dx + dy * dy <= this.chatRadius * this.chatRadius;
+  }
+
+  /** Recalcula e envia `nearby` (quem está no raio de cada jogador) quando muda. */
+  private updateNearby(): void {
+    for (const client of this.clients) {
+      const ids: string[] = [];
+      for (const other of this.clients) {
+        if (other.sessionId !== client.sessionId && this.withinRadius(client.sessionId, other.sessionId)) {
+          ids.push(other.sessionId);
+        }
+      }
+      const key = ids.sort().join(",");
+      if (this.lastNearby.get(client.sessionId) !== key) {
+        this.lastNearby.set(client.sessionId, key);
+        client.send(ServerMessage.Nearby, { ids });
+      }
+    }
   }
 
   private tick(): void {
@@ -199,5 +233,6 @@ export class AmbienteRoom extends Room<AmbienteState> {
       }
     }
     this.intents.clear();
+    this.updateNearby();
   }
 }
