@@ -24,3 +24,16 @@ export const MAX_LISTENERS_SHOWN = 5;
 
 /** Nome do tipo de Room registrado no Colyseus. */
 export const ROOM_AMBIENTE = "ambiente";
+
+/** Dimensões do mundo (em células de 16px). */
+export const DEFAULT_WORLD_W_CELLS = 24;
+export const DEFAULT_WORLD_H_CELLS = 16;
+export const MIN_WORLD_CELLS = 4;
+export const MAX_WORLD_CELLS = 64;
+
+/** Máximo de cores na paleta da arte de um mundo. */
+export const MAX_PALETTE = 64;
+
+/** Limites de texto. */
+export const MAX_SERVER_NAME = 60;
+export const MAX_AMBIENTE_NAME = 60;

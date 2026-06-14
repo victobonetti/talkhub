@@ -9,6 +9,7 @@ import { env } from "./env.js";
 import { AmbienteRoom } from "./rooms/AmbienteRoom.js";
 import { authRoutes } from "./routes/auth.js";
 import { avatarRoutes } from "./routes/avatar.js";
+import { serverRoutes } from "./routes/servers.js";
 
 async function main(): Promise<void> {
   const fastify = Fastify({ logger: true });
@@ -36,6 +37,7 @@ async function main(): Promise<void> {
   fastify.get("/health", async () => ({ ok: true, ts: Date.now() }));
   await fastify.register(authRoutes);
   await fastify.register(avatarRoutes);
+  await fastify.register(serverRoutes);
 
   // Colyseus compartilha o mesmo servidor HTTP do Fastify (mesma porta).
   const gameServer = new Server({

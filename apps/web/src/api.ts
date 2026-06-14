@@ -1,4 +1,10 @@
-import type { AvatarDto, PublicUser } from "@talkhub/shared";
+import type {
+  AmbienteFullDto,
+  AvatarDto,
+  PublicUser,
+  ServerCreateInput,
+  ServerListItem,
+} from "@talkhub/shared";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:2567";
 const TOKEN_KEY = "talkhub_token";
@@ -76,4 +82,20 @@ export async function putAvatar(bits: string, color: string): Promise<AvatarDto>
     body: JSON.stringify({ bits, color }),
   });
   return avatar;
+}
+
+export async function listServers(): Promise<ServerListItem[]> {
+  const { servers } = await req<{ servers: ServerListItem[] }>("/servers");
+  return servers;
+}
+
+export async function createServer(
+  input: ServerCreateInput,
+): Promise<{ id: string; ambienteId: string }> {
+  return req("/servers", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function getAmbiente(id: string): Promise<AmbienteFullDto> {
+  const { ambiente } = await req<{ ambiente: AmbienteFullDto }>(`/ambientes/${id}`);
+  return ambiente;
 }

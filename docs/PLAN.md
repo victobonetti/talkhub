@@ -456,8 +456,11 @@ como backlog.
   estruturado (ativa via env); API de avatar (`GET/PUT /avatar/me`); editor
   16×16 monocromático (lápis/borracha/balde + cor única) + gerador aleatório,
   persistindo no Postgres. Verificado end-to-end contra Postgres real.
-- **M2 — Servidores & Editor de mapa**: CRUD de servidor/ambiente; editor de
-  arte (lápis/borracha/balde) + editor de colisão + spawn; salvar/carregar.
+- **M2 — Servidores & Editor de mapa** ✅: REST de servidores/ambientes
+  (`POST /servers`, `GET /servers`, `GET /servers/:id`, `GET /ambientes/:id`);
+  editor de mapa em canvas (arte indexada por paleta com lápis/borracha/balde,
+  camada de colisão, spawn e slider de raio com preview circular); lista de
+  servidores no front. Verificado end-to-end (roundtrip de arte/colisão).
 - **M3 — Realtime autoritativo**: `AmbienteRoom` (Colyseus), join, `PlayerState`
   Schema, movimento grid-based validado por tick, interpolação no cliente.
 - **M4 — Chat efêmero + proximidade**: relay seguro **por raio**, cálculo de
