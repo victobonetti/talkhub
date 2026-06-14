@@ -447,9 +447,11 @@ como backlog.
 
 ## 12. Roadmap / milestones
 
-- **M0 — Fundação**: monorepo, `shared` (tipos + protocolo zod), lint/format,
-  Fastify hello, Vite app, **Colyseus server vazio** (1 Room de teste), **Prisma
-  schema** Postgres + migration inicial.
+- **M0 — Fundação** ✅: monorepo (workspaces npm), `shared` (tipos + zod +
+  `PlayerState`/`AmbienteState` Schema), ESLint/Prettier, Fastify (`/health`),
+  Vite app, **Colyseus** `AmbienteRoom` (join/leave + relay de chat placeholder),
+  **Prisma schema** Postgres. (Migration roda quando `DATABASE_URL` estiver
+  configurada.) Verificado end-to-end: client conecta, state-sync e chat relay.
 - **M1 — Auth & Avatar**: Google OAuth + guest; editor 16×16 + gerador
   aleatório; persistir avatar.
 - **M2 — Servidores & Editor de mapa**: CRUD de servidor/ambiente; editor de

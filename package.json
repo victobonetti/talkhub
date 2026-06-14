@@ -1,0 +1,28 @@
+{
+  "name": "talkhub",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n shared,server,web -c blue,green,magenta \"npm:dev:shared\" \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:shared": "npm run dev -w @talkhub/shared",
+    "dev:server": "npm run dev -w @talkhub/server",
+    "dev:web": "npm run dev -w @talkhub/web",
+    "build": "npm run build -w @talkhub/shared && npm run build -w @talkhub/server && npm run build -w @talkhub/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.18.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.21.0"
+  }
+}

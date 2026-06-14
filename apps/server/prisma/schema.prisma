@@ -1,0 +1,109 @@
+// Prisma schema do Talkhub. Reflete o modelo de dados de docs/PLAN.md (§4).
+// Mensagens de chat são efêmeras e NÃO têm tabela aqui (por design).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserKind {
+  google
+  guest
+}
+
+model User {
+  id          String   @id @default(uuid())
+  kind        UserKind
+  googleSub   String?  @unique @map("google_sub")
+  displayName String   @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+
+  avatar    Avatar?
+  servers   Server[]
+  positions PlayerPosition[]
+
+  @@map("users")
+}
+
+model Avatar {
+  userId String @id @map("user_id")
+  // sprite 16x16 monocromático: 1 bit/pixel = 32 bytes (silhueta on/off)
+  bits      Bytes
+  color     String // cor única de exibição (hex)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("avatars")
+}
+
+model Server {
+  id        String   @id @default(uuid())
+  ownerId   String   @map("owner_id")
+  name      String
+  isPublic  Boolean  @default(true) @map("is_public")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  owner     User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ambientes Ambiente[]
+
+  @@map("servers")
+}
+
+model Ambiente {
+  id       String @id @default(uuid())
+  serverId String @map("server_id")
+  name     String
+  widthPx  Int    @map("width_px")
+  heightPx Int    @map("height_px")
+  // arte pixel-art SEM PNG: paleta + 1 índice por pixel (dados crus)
+  artPalette Json  @map("art_palette")
+  artIndices Bytes @map("art_indices")
+  // colisão: bitset (W/16)*(H/16)
+  collision  Bytes
+  spawnX     Int   @map("spawn_x")
+  spawnY     Int   @map("spawn_y")
+  chatRadius Int   @map("chat_radius")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  server        Server           @relation(fields: [serverId], references: [id], onDelete: Cascade)
+  positions     PlayerPosition[]
+  portals       Portal[]         @relation("AmbientePortals")
+  portalTargets Portal[]         @relation("PortalTargets")
+
+  @@map("ambientes")
+}
+
+model PlayerPosition {
+  userId     String   @map("user_id")
+  ambienteId String   @map("ambiente_id")
+  cellX      Int      @map("cell_x")
+  cellY      Int      @map("cell_y")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ambiente Ambiente @relation(fields: [ambienteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, ambienteId])
+  @@map("player_positions")
+}
+
+model Portal {
+  id               String @id @default(uuid())
+  ambienteId       String @map("ambiente_id")
+  cellX            Int    @map("cell_x")
+  cellY            Int    @map("cell_y")
+  targetAmbienteId String @map("target_ambiente_id")
+  targetSpawnX     Int    @map("target_spawn_x")
+  targetSpawnY     Int    @map("target_spawn_y")
+
+  ambiente       Ambiente @relation("AmbientePortals", fields: [ambienteId], references: [id], onDelete: Cascade)
+  targetAmbiente Ambiente @relation("PortalTargets", fields: [targetAmbienteId], references: [id], onDelete: Cascade)
+
+  @@map("portals")
+}
