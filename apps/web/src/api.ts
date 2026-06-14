@@ -1,10 +1,13 @@
 import type {
   AmbienteFullDto,
+  AmbienteMetaDto,
   AvatarDto,
   PublicUser,
   ServerCreateInput,
   ServerListItem,
 } from "@talkhub/shared";
+
+export const SERVER_WS_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:2567";
 const TOKEN_KEY = "talkhub_token";
@@ -98,4 +101,14 @@ export async function createServer(
 export async function getAmbiente(id: string): Promise<AmbienteFullDto> {
   const { ambiente } = await req<{ ambiente: AmbienteFullDto }>(`/ambientes/${id}`);
   return ambiente;
+}
+
+interface ServerDetail {
+  id: string;
+  name: string;
+  ownerName: string;
+  ambientes: AmbienteMetaDto[];
+}
+export async function getServer(id: string): Promise<ServerDetail> {
+  return req<ServerDetail>(`/servers/${id}`);
 }

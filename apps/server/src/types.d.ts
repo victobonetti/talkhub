@@ -1,11 +1,6 @@
 import "@fastify/jwt";
 import type { FastifyReply, FastifyRequest } from "fastify";
-
-export interface SessionPayload {
-  sub: string; // userId
-  kind: "google" | "guest";
-  name: string;
-}
+import type { SessionPayload } from "./session.js";
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {

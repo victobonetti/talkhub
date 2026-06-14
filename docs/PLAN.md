@@ -461,8 +461,12 @@ como backlog.
   editor de mapa em canvas (arte indexada por paleta com lápis/borracha/balde,
   camada de colisão, spawn e slider de raio com preview circular); lista de
   servidores no front. Verificado end-to-end (roundtrip de arte/colisão).
-- **M3 — Realtime autoritativo**: `AmbienteRoom` (Colyseus), join, `PlayerState`
-  Schema, movimento grid-based validado por tick, interpolação no cliente.
+- **M3 — Realtime autoritativo** ✅: `AmbienteRoom` carrega colisão/meta do
+  banco, autentica o join por JWT, valida movimento grid-based por tick
+  (limites + colisão, com `correction`), persiste posição ao sair e distribui
+  avatares; game view no cliente renderiza o mapa + avatares andando com
+  interpolação (setas movem). Verificado end-to-end (bloqueio, persistência,
+  rejeição de auth).
 - **M4 — Chat efêmero + proximidade**: relay seguro **por raio**, cálculo de
   `nearby`, barra de ouvintes ("+X"), miniatura de avatar, handler de teclado
   (setas vs. digitação), rate limit.

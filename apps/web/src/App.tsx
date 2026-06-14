@@ -4,6 +4,7 @@ import {
   captureTokenFromHash,
   clearToken,
   getMe,
+  getServer,
   getToken,
   googleAvailable,
   googleLoginHref,
@@ -12,13 +13,18 @@ import {
 } from "./api";
 import { AvatarEditor } from "./AvatarEditor";
 import { MapEditor } from "./MapEditor";
+import { GameView } from "./GameView";
 
-type View = "list" | "avatar" | "create";
+type View =
+  | { name: "list" }
+  | { name: "avatar" }
+  | { name: "create" }
+  | { name: "game"; ambienteId: string };
 
 export function App() {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<View>("list");
+  const [view, setView] = useState<View>({ name: "list" });
 
   useEffect(() => {
     captureTokenFromHash();
@@ -35,7 +41,13 @@ export function App() {
   const logout = () => {
     clearToken();
     setUser(null);
-    setView("list");
+    setView({ name: "list" });
+  };
+
+  const enterServer = async (serverId: string) => {
+    const detail = await getServer(serverId);
+    const first = detail.ambientes[0];
+    if (first) setView({ name: "game", ambienteId: first.id });
   };
 
   if (loading) return <Shell>Carregando…</Shell>;
@@ -57,21 +69,31 @@ export function App() {
         </button>
       </header>
 
-      {view === "list" && (
-        <ServerList onCreate={() => setView("create")} onEditAvatar={() => setView("avatar")} />
+      {view.name === "list" && (
+        <ServerList
+          onCreate={() => setView({ name: "create" })}
+          onEditAvatar={() => setView({ name: "avatar" })}
+          onEnter={enterServer}
+        />
       )}
-      {view === "avatar" && (
+      {view.name === "avatar" && (
         <section>
-          <button onClick={() => setView("list")}>← Voltar</button>
+          <button onClick={() => setView({ name: "list" })}>← Voltar</button>
           <h2>Seu personagem (16×16)</h2>
           <AvatarEditor />
         </section>
       )}
-      {view === "create" && (
+      {view.name === "create" && (
         <section>
           <h2>Criar servidor</h2>
-          <MapEditor onSaved={() => setView("list")} onCancel={() => setView("list")} />
+          <MapEditor
+            onSaved={() => setView({ name: "list" })}
+            onCancel={() => setView({ name: "list" })}
+          />
         </section>
+      )}
+      {view.name === "game" && (
+        <GameView ambienteId={view.ambienteId} onExit={() => setView({ name: "list" })} />
       )}
     </Shell>
   );
@@ -80,9 +102,11 @@ export function App() {
 function ServerList({
   onCreate,
   onEditAvatar,
+  onEnter,
 }: {
   onCreate: () => void;
   onEditAvatar: () => void;
+  onEnter: (serverId: string) => void;
 }) {
   const [servers, setServers] = useState<ServerListItem[] | null>(null);
 
@@ -110,11 +134,12 @@ function ServerList({
           {servers.map((s) => (
             <li
               key={s.id}
-              style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12 }}
+              onClick={() => onEnter(s.id)}
+              style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, cursor: "pointer" }}
             >
               <strong>{s.name}</strong>
               <div style={{ fontSize: 13, color: "#666" }}>
-                por {s.ownerName} · {s.ambienteCount} ambiente(s)
+                por {s.ownerName} · {s.ambienteCount} ambiente(s) · clique para entrar
               </div>
             </li>
           ))}

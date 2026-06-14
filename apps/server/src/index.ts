@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   const gameServer = new Server({
     transport: new WebSocketTransport({ server: fastify.server }),
   });
-  gameServer.define(ROOM_AMBIENTE, AmbienteRoom);
+  gameServer.define(ROOM_AMBIENTE, AmbienteRoom).filterBy(["ambienteId"]);
 
   await fastify.listen({ port: env.PORT, host: env.HOST });
   fastify.log.info(`Talkhub realtime + REST em ${env.HOST}:${env.PORT}`);
