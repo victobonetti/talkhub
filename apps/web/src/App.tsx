@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { CELL_SIZE, type PublicUser, type ServerListItem } from "@talkhub/shared";
 import { base64ToBytes } from "@talkhub/shared";
+import type { AmbienteMetaDto } from "@talkhub/shared";
 import {
   captureTokenFromHash,
   clearToken,
+  createPortal,
   getAmbiente,
   getMe,
+  getServer,
   getToken,
   googleAvailable,
   googleLoginHref,
@@ -19,8 +22,9 @@ import { GameView } from "./GameView";
 type View =
   | { name: "list" }
   | { name: "avatar" }
-  | { name: "create" }
-  | { name: "game"; ambienteId: string };
+  | { name: "create"; serverId?: string }
+  | { name: "manage"; serverId: string }
+  | { name: "game"; ambienteId: string; spawn?: { x: number; y: number } };
 
 export function App() {
   const [user, setUser] = useState<PublicUser | null>(null);
@@ -73,6 +77,7 @@ export function App() {
           onCreate={() => setView({ name: "create" })}
           onEditAvatar={() => setView({ name: "avatar" })}
           onEnter={enterServer}
+          onManage={(serverId) => setView({ name: "manage", serverId })}
         />
       )}
       {view.name === "avatar" && (
@@ -84,15 +89,34 @@ export function App() {
       )}
       {view.name === "create" && (
         <section>
-          <h2>Criar servidor</h2>
+          <h2>{view.serverId ? "Adicionar ambiente" : "Criar servidor"}</h2>
           <MapEditor
-            onSaved={() => setView({ name: "list" })}
-            onCancel={() => setView({ name: "list" })}
+            serverId={view.serverId}
+            onSaved={(serverId) => setView({ name: "manage", serverId })}
+            onCancel={() =>
+              setView(view.serverId ? { name: "manage", serverId: view.serverId } : { name: "list" })
+            }
           />
         </section>
       )}
+      {view.name === "manage" && (
+        <ManageServer
+          serverId={view.serverId}
+          onBack={() => setView({ name: "list" })}
+          onAddAmbiente={() => setView({ name: "create", serverId: view.serverId })}
+          onEnter={(ambienteId) => setView({ name: "game", ambienteId })}
+        />
+      )}
       {view.name === "game" && (
-        <GameView ambienteId={view.ambienteId} onExit={() => setView({ name: "list" })} />
+        <GameView
+          key={view.ambienteId}
+          ambienteId={view.ambienteId}
+          initialSpawn={view.spawn}
+          onExit={() => setView({ name: "list" })}
+          onPortal={(targetAmbienteId, spawn) =>
+            setView({ name: "game", ambienteId: targetAmbienteId, spawn })
+          }
+        />
       )}
     </Shell>
   );
@@ -102,10 +126,12 @@ function ServerList({
   onCreate,
   onEditAvatar,
   onEnter,
+  onManage,
 }: {
   onCreate: () => void;
   onEditAvatar: () => void;
   onEnter: (ambienteId: string | null) => void;
+  onManage: (serverId: string) => void;
 }) {
   const [servers, setServers] = useState<ServerListItem[] | null>(null);
 
@@ -160,6 +186,15 @@ function ServerList({
                   ● {s.playerCount} online · {s.ambienteCount} ambiente(s)
                 </div>
               </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onManage(s.id);
+                }}
+                style={{ alignSelf: "flex-start", fontSize: 12 }}
+              >
+                ⚙ Gerenciar
+              </button>
             </li>
           ))}
         </ul>
@@ -218,6 +253,130 @@ function ServerPreview({ ambienteId }: { ambienteId: string }) {
         borderRadius: 4,
       }}
     />
+  );
+}
+
+function ManageServer({
+  serverId,
+  onBack,
+  onAddAmbiente,
+  onEnter,
+}: {
+  serverId: string;
+  onBack: () => void;
+  onAddAmbiente: () => void;
+  onEnter: (ambienteId: string) => void;
+}) {
+  const [ambientes, setAmbientes] = useState<AmbienteMetaDto[] | null>(null);
+  const reload = () => getServer(serverId).then((s) => setAmbientes(s.ambientes)).catch(() => {});
+  useEffect(() => {
+    reload();
+  }, [serverId]);
+
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button onClick={onBack}>← Voltar</button>
+        <h2 style={{ margin: 0 }}>Gerenciar servidor</h2>
+      </div>
+
+      <div>
+        <h3>Ambientes</h3>
+        <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
+          {ambientes?.map((a) => (
+            <li key={a.id} style={{ border: "1px solid #eee", borderRadius: 6, padding: 8 }}>
+              <strong>{a.name}</strong> ({a.wCells}×{a.hCells}) · raio {a.chatRadius}{" "}
+              <button onClick={() => onEnter(a.id)} style={{ marginLeft: 8 }}>
+                Entrar
+              </button>
+            </li>
+          ))}
+        </ul>
+        <button onClick={onAddAmbiente} style={{ padding: "6px 10px" }}>
+          + Adicionar ambiente
+        </button>
+      </div>
+
+      {ambientes && ambientes.length >= 2 && (
+        <PortalForm ambientes={ambientes} onCreated={reload} />
+      )}
+      {ambientes && ambientes.length < 2 && (
+        <p style={{ fontSize: 13, color: "#888" }}>
+          Adicione um segundo ambiente para poder criar portais entre eles.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function PortalForm({
+  ambientes,
+  onCreated,
+}: {
+  ambientes: AmbienteMetaDto[];
+  onCreated: () => void;
+}) {
+  const [from, setFrom] = useState(ambientes[0].id);
+  const [to, setTo] = useState(ambientes[1].id);
+  const [cell, setCell] = useState({ x: 0, y: 0 });
+  const [spawn, setSpawn] = useState({ x: 0, y: 0 });
+  const [msg, setMsg] = useState("");
+
+  const create = async () => {
+    setMsg("");
+    try {
+      await createPortal(from, {
+        cellX: cell.x,
+        cellY: cell.y,
+        targetAmbienteId: to,
+        targetSpawnX: spawn.x,
+        targetSpawnY: spawn.y,
+      });
+      setMsg("Portal criado!");
+      onCreated();
+    } catch {
+      setMsg("Erro ao criar portal.");
+    }
+  };
+
+  const num = (v: string) => Math.max(0, Math.round(Number(v) || 0));
+
+  return (
+    <div style={{ border: "1px solid #eee", borderRadius: 6, padding: 10, display: "grid", gap: 6 }}>
+      <h3 style={{ margin: 0 }}>Criar portal</h3>
+      <label>
+        De:{" "}
+        <select value={from} onChange={(e) => setFrom(e.target.value)}>
+          {ambientes.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>{" "}
+        na célula x
+        <input type="number" value={cell.x} onChange={(e) => setCell({ ...cell, x: num(e.target.value) })} style={{ width: 56 }} />
+        y
+        <input type="number" value={cell.y} onChange={(e) => setCell({ ...cell, y: num(e.target.value) })} style={{ width: 56 }} />
+      </label>
+      <label>
+        Para:{" "}
+        <select value={to} onChange={(e) => setTo(e.target.value)}>
+          {ambientes.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>{" "}
+        spawn x
+        <input type="number" value={spawn.x} onChange={(e) => setSpawn({ ...spawn, x: num(e.target.value) })} style={{ width: 56 }} />
+        y
+        <input type="number" value={spawn.y} onChange={(e) => setSpawn({ ...spawn, y: num(e.target.value) })} style={{ width: 56 }} />
+      </label>
+      <div>
+        <button onClick={create}>Criar portal</button>
+        {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
+      </div>
+    </div>
   );
 }
 

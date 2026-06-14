@@ -112,7 +112,17 @@ function AvatarThumb({ payload, size = 22 }: { payload?: AvatarPayload; size?: n
   );
 }
 
-export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: () => void }) {
+export function GameView({
+  ambienteId,
+  initialSpawn,
+  onExit,
+  onPortal,
+}: {
+  ambienteId: string;
+  initialSpawn?: { x: number; y: number };
+  onExit: () => void;
+  onPortal: (targetAmbienteId: string, spawn: { x: number; y: number }) => void;
+}) {
   const [status, setStatus] = useState("conectando…");
   const [meta, setMeta] = useState<AmbienteFullDto | null>(null);
   const [avatars, setAvatars] = useState<Map<string, AvatarPayload>>(new Map());
@@ -153,7 +163,12 @@ export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: (
       if (!active) return;
       setMeta(full);
       const client = new Client(SERVER_WS_URL);
-      room = await client.joinOrCreate(ROOM_AMBIENTE, { ambienteId, token: getToken() });
+      room = await client.joinOrCreate(ROOM_AMBIENTE, {
+        ambienteId,
+        token: getToken(),
+        spawnX: initialSpawn?.x,
+        spawnY: initialSpawn?.y,
+      });
       if (!active) {
         void room.leave();
         return;
@@ -171,6 +186,12 @@ export function GameView({ ambienteId, onExit }: { ambienteId: string; onExit: (
       room.onMessage("nearby", (m: { ids: string[] }) => setNearby(m.ids));
       room.onMessage("init", (m: { you: string }) => setMyId(m.you));
       room.onMessage("correction", () => {});
+      room.onMessage(
+        "portal",
+        (m: { targetAmbienteId: string; spawnX: number; spawnY: number }) => {
+          onPortal(m.targetAmbienteId, { x: m.spawnX, y: m.spawnY });
+        },
+      );
     })().catch((e: unknown) => {
       if (active) setStatus(`erro: ${e instanceof Error ? e.message : String(e)}`);
     });

@@ -1,11 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import { matchMaker } from "@colyseus/core";
 import {
+  AmbienteCreateSchema,
   CELL_SIZE,
+  PortalCreateSchema,
   ROOM_AMBIENTE,
   ServerCreateSchema,
   type AmbienteFullDto,
   type AmbienteMetaDto,
+  type PortalDto,
   type ServerListItem,
 } from "@talkhub/shared";
 import { prisma } from "../db.js";
@@ -111,16 +114,85 @@ export async function serverRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
-  // Ambiente completo (arte + colisão) para carregar no jogo/editor.
+  // Ambiente completo (arte + colisão + portais) para carregar no jogo/editor.
   app.get<{ Params: { id: string } }>("/ambientes/:id", async (req, reply) => {
-    const a = await prisma.ambiente.findUnique({ where: { id: req.params.id } });
+    const a = await prisma.ambiente.findUnique({
+      where: { id: req.params.id },
+      include: { portals: true },
+    });
     if (!a) return reply.code(404).send({ error: "not_found" });
+    const portals: PortalDto[] = a.portals.map((p) => ({
+      id: p.id,
+      cellX: p.cellX,
+      cellY: p.cellY,
+      targetAmbienteId: p.targetAmbienteId,
+      targetSpawnX: p.targetSpawnX,
+      targetSpawnY: p.targetSpawnY,
+    }));
     const full: AmbienteFullDto = {
       ...metaDto(a),
       palette: a.artPalette as string[],
       art: Buffer.from(a.artIndices).toString("base64"),
       collision: Buffer.from(a.collision).toString("base64"),
+      portals,
     };
     return { ambiente: full };
   });
+
+  // Adicionar um ambiente a um servidor existente (só o dono).
+  app.post<{ Params: { id: string } }>(
+    "/servers/:id/ambientes",
+    { preHandler: [app.authenticate] },
+    async (req, reply) => {
+      const server = await prisma.server.findUnique({ where: { id: req.params.id } });
+      if (!server) return reply.code(404).send({ error: "not_found" });
+      if (server.ownerId !== req.user.sub) return reply.code(403).send({ error: "forbidden" });
+      const a = AmbienteCreateSchema.parse(req.body);
+      const created = await prisma.ambiente.create({
+        data: {
+          serverId: server.id,
+          name: a.name,
+          widthPx: a.wCells * CELL_SIZE,
+          heightPx: a.hCells * CELL_SIZE,
+          artPalette: a.palette,
+          artIndices: Buffer.from(a.art, "base64"),
+          collision: Buffer.from(a.collision, "base64"),
+          spawnX: a.spawnX,
+          spawnY: a.spawnY,
+          chatRadius: a.chatRadius,
+        },
+      });
+      return { id: created.id };
+    },
+  );
+
+  // Criar um portal num ambiente (só o dono do servidor).
+  app.post<{ Params: { id: string } }>(
+    "/ambientes/:id/portals",
+    { preHandler: [app.authenticate] },
+    async (req, reply) => {
+      const a = await prisma.ambiente.findUnique({
+        where: { id: req.params.id },
+        include: { server: true },
+      });
+      if (!a) return reply.code(404).send({ error: "not_found" });
+      if (a.server.ownerId !== req.user.sub) return reply.code(403).send({ error: "forbidden" });
+      const body = PortalCreateSchema.parse(req.body);
+      const target = await prisma.ambiente.findUnique({ where: { id: body.targetAmbienteId } });
+      if (!target || target.serverId !== a.serverId) {
+        return reply.code(400).send({ error: "invalid_target" });
+      }
+      const portal = await prisma.portal.create({
+        data: {
+          ambienteId: a.id,
+          cellX: body.cellX,
+          cellY: body.cellY,
+          targetAmbienteId: body.targetAmbienteId,
+          targetSpawnX: body.targetSpawnX,
+          targetSpawnY: body.targetSpawnY,
+        },
+      });
+      return { id: portal.id };
+    },
+  );
 }

@@ -20,6 +20,14 @@ import { verifySession, type SessionPayload } from "../session.js";
 interface JoinOpts {
   ambienteId?: string;
   token?: string;
+  spawnX?: number;
+  spawnY?: number;
+}
+
+interface PortalTarget {
+  targetAmbienteId: string;
+  spawnX: number;
+  spawnY: number;
 }
 
 const DELTA: Record<Dir, [number, number]> = {
@@ -46,6 +54,8 @@ export class AmbienteRoom extends Room<AmbienteState> {
   private collision: Uint8Array = new Uint8Array(0);
   private spawn = { x: 0, y: 0 };
   private chatRadius = 5;
+  /** portais por célula: chave "x,y". */
+  private portals = new Map<string, PortalTarget>();
 
   /** sessões -> dados de auth e avatar. */
   private sessions = new Map<string, SessionPayload>();
@@ -59,9 +69,20 @@ export class AmbienteRoom extends Room<AmbienteState> {
 
   async onCreate(options: JoinOpts): Promise<void> {
     const a = options.ambienteId
-      ? await prisma.ambiente.findUnique({ where: { id: options.ambienteId } })
+      ? await prisma.ambiente.findUnique({
+          where: { id: options.ambienteId },
+          include: { portals: true },
+        })
       : null;
     if (!a) throw new Error("ambiente_not_found");
+
+    for (const p of a.portals) {
+      this.portals.set(`${p.cellX},${p.cellY}`, {
+        targetAmbienteId: p.targetAmbienteId,
+        spawnX: p.targetSpawnX,
+        spawnY: p.targetSpawnY,
+      });
+    }
 
     this.ambienteId = a.id;
     this.ambienteName = a.name;
@@ -109,13 +130,23 @@ export class AmbienteRoom extends Room<AmbienteState> {
     this.sessions.set(client.sessionId, session);
 
     // posição salva ou spawn
-    const saved = await prisma.playerPosition.findUnique({
-      where: { userId_ambienteId: { userId: session.sub, ambienteId: this.ambienteId } },
-    });
-    const start =
-      saved && this.inBounds(saved.cellX, saved.cellY) && !this.blocked(saved.cellX, saved.cellY)
-        ? { x: saved.cellX, y: saved.cellY }
-        : this.spawn;
+    // Spawn explícito (chegada via portal) tem prioridade sobre a posição salva.
+    let start = this.spawn;
+    if (
+      options.spawnX !== undefined &&
+      options.spawnY !== undefined &&
+      this.inBounds(options.spawnX, options.spawnY) &&
+      !this.blocked(options.spawnX, options.spawnY)
+    ) {
+      start = { x: options.spawnX, y: options.spawnY };
+    } else {
+      const saved = await prisma.playerPosition.findUnique({
+        where: { userId_ambienteId: { userId: session.sub, ambienteId: this.ambienteId } },
+      });
+      if (saved && this.inBounds(saved.cellX, saved.cellY) && !this.blocked(saved.cellX, saved.cellY)) {
+        start = { x: saved.cellX, y: saved.cellY };
+      }
+    }
 
     const player = new PlayerState();
     player.id = client.sessionId;
@@ -240,6 +271,15 @@ export class AmbienteRoom extends Room<AmbienteState> {
       if (this.inBounds(tx, ty) && !this.blocked(tx, ty)) {
         player.cellX = tx;
         player.cellY = ty;
+        const portal = this.portals.get(`${tx},${ty}`);
+        if (portal) {
+          const client = this.clients.find((c) => c.sessionId === sessionId);
+          client?.send(ServerMessage.Portal, {
+            targetAmbienteId: portal.targetAmbienteId,
+            spawnX: portal.spawnX,
+            spawnY: portal.spawnY,
+          });
+        }
       } else {
         const client = this.clients.find((c) => c.sessionId === sessionId);
         client?.send(ServerMessage.Correction, {

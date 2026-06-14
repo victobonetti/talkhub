@@ -11,7 +11,7 @@ import {
   bytesToBase64,
   packBitset,
 } from "@talkhub/shared";
-import { createServer } from "./api";
+import { addAmbiente, createServer } from "./api";
 
 type Mode = "art" | "collision" | "spawn" | "radius";
 type Tool = "pencil" | "eraser" | "bucket";
@@ -26,7 +26,15 @@ function hexToRgb(hex: string): [number, number, number] {
   ];
 }
 
-export function MapEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel: () => void }) {
+export function MapEditor({
+  serverId,
+  onSaved,
+  onCancel,
+}: {
+  serverId?: string;
+  onSaved: (serverId: string) => void;
+  onCancel: () => void;
+}) {
   const [serverName, setServerName] = useState("");
   const [ambienteName, setAmbienteName] = useState("Lobby");
   const [wCells, setWCells] = useState(DEFAULT_WORLD_W_CELLS);
@@ -182,28 +190,31 @@ export function MapEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel
   }, []);
 
   const save = async () => {
-    if (!serverName.trim()) {
+    if (!serverId && !serverName.trim()) {
       setMsg("Dê um nome ao servidor.");
       return;
     }
     setSaving(true);
     setMsg("");
+    const ambiente = {
+      name: ambienteName.trim() || "Lobby",
+      wCells,
+      hCells,
+      palette,
+      art: bytesToBase64(artRef.current),
+      collision: bytesToBase64(packBitset(collRef.current, collRef.current.length)),
+      spawnX: spawn.x,
+      spawnY: spawn.y,
+      chatRadius,
+    };
     try {
-      await createServer({
-        name: serverName.trim(),
-        ambiente: {
-          name: ambienteName.trim() || "Lobby",
-          wCells,
-          hCells,
-          palette,
-          art: bytesToBase64(artRef.current),
-          collision: bytesToBase64(packBitset(collRef.current, collRef.current.length)),
-          spawnX: spawn.x,
-          spawnY: spawn.y,
-          chatRadius,
-        },
-      });
-      onSaved();
+      if (serverId) {
+        await addAmbiente(serverId, ambiente);
+        onSaved(serverId);
+      } else {
+        const res = await createServer({ name: serverName.trim(), ambiente });
+        onSaved(res.id);
+      }
     } catch {
       setMsg("Erro ao salvar (verifique os campos).");
     } finally {
@@ -220,12 +231,14 @@ export function MapEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <button onClick={onCancel}>← Voltar</button>
-        <input
-          placeholder="Nome do servidor"
-          value={serverName}
-          onChange={(e) => setServerName(e.target.value)}
-          style={{ padding: 6 }}
-        />
+        {!serverId && (
+          <input
+            placeholder="Nome do servidor"
+            value={serverName}
+            onChange={(e) => setServerName(e.target.value)}
+            style={{ padding: 6 }}
+          />
+        )}
         <input
           placeholder="Nome do ambiente"
           value={ambienteName}
@@ -352,7 +365,7 @@ export function MapEditor({ onSaved, onCancel }: { onSaved: () => void; onCancel
           disabled={saving}
           style={{ background: "#2563eb", color: "#fff", padding: "8px 14px", border: 0, borderRadius: 6 }}
         >
-          {saving ? "Salvando…" : "Salvar servidor"}
+          {saving ? "Salvando…" : serverId ? "Adicionar ambiente" : "Salvar servidor"}
         </button>
         {msg && <span style={{ fontSize: 13, color: "#c0392b" }}>{msg}</span>}
       </div>

@@ -49,6 +49,13 @@ export interface CorrectionPayload {
   seq: number;
 }
 
+/** Jogador pisou num portal: cliente deve trocar de ambiente. */
+export interface PortalPayload {
+  targetAmbienteId: string;
+  spawnX: number;
+  spawnY: number;
+}
+
 /** Nomes das mensagens server -> client. */
 export const ServerMessage = {
   Init: "init",
@@ -56,6 +63,7 @@ export const ServerMessage = {
   Nearby: "nearby",
   Chat: "chat",
   Correction: "correction",
+  Portal: "portal",
 } as const;
 export type ServerMessageName = (typeof ServerMessage)[keyof typeof ServerMessage];
 

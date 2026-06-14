@@ -1,7 +1,9 @@
 import type {
+  AmbienteCreateInput,
   AmbienteFullDto,
   AmbienteMetaDto,
   AvatarDto,
+  PortalCreateInput,
   PublicUser,
   ServerCreateInput,
   ServerListItem,
@@ -111,4 +113,18 @@ interface ServerDetail {
 }
 export async function getServer(id: string): Promise<ServerDetail> {
   return req<ServerDetail>(`/servers/${id}`);
+}
+
+export async function addAmbiente(
+  serverId: string,
+  ambiente: AmbienteCreateInput,
+): Promise<{ id: string }> {
+  return req(`/servers/${serverId}/ambientes`, { method: "POST", body: JSON.stringify(ambiente) });
+}
+
+export async function createPortal(
+  ambienteId: string,
+  body: PortalCreateInput,
+): Promise<{ id: string }> {
+  return req(`/ambientes/${ambienteId}/portals`, { method: "POST", body: JSON.stringify(body) });
 }

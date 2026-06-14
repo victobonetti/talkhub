@@ -119,9 +119,28 @@ export interface AmbienteMetaDto {
   chatRadius: number;
 }
 
+export interface PortalDto {
+  id: string;
+  cellX: number;
+  cellY: number;
+  targetAmbienteId: string;
+  targetSpawnX: number;
+  targetSpawnY: number;
+}
+
 /** Ambiente completo para carregar no jogo/editor. */
 export interface AmbienteFullDto extends AmbienteMetaDto {
   palette: string[];
   art: string; // base64
   collision: string; // base64
+  portals: PortalDto[];
 }
+
+export const PortalCreateSchema = z.object({
+  cellX: z.number().int().nonnegative(),
+  cellY: z.number().int().nonnegative(),
+  targetAmbienteId: z.string().uuid(),
+  targetSpawnX: z.number().int().nonnegative(),
+  targetSpawnY: z.number().int().nonnegative(),
+});
+export type PortalCreateInput = z.infer<typeof PortalCreateSchema>;

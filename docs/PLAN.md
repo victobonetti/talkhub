@@ -475,10 +475,12 @@ como backlog.
 - **M5 — Game view & responsivo** ✅: split horizontal no desktop, **split
   vertical + D-pad** no mobile, barra de ouvintes no rodapé, lista de servidores
   com **preview do mapa e presença** (online por servidor via matchMaker).
-- **M6 — Melhorias** (em andamento): ✅ balões de fala, ✅ destaque do raio,
-  ✅ rate limit de chat, ✅ reconexão com posição salva (do M3); **portais /
-  multi-ambiente** (backend + traversal) — ver abaixo; E2E opcional fica como
-  backlog.
+- **M6 — Melhorias** ✅: balões de fala, destaque do raio, rate limit de chat,
+  reconexão com posição salva (do M3), e **portais / multi-ambiente** completos —
+  servidor com múltiplos ambientes, portais ligando células a outro ambiente,
+  traversal autoritativa (mensagem `portal` + spawn override no join) e UI de
+  gerenciamento (adicionar ambiente + criar portal). E2E do chat fica como
+  backlog opcional.
 
 ---
 
