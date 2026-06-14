@@ -1,0 +1,25 @@
+# Talkhub web (React + Vite) — build ESTÁTICO servido por nginx.
+# As VITE_* são build-time e ficam embutidas no bundle; passe-as via build-args.
+# Build context = raiz do monorepo.
+FROM node:20-bookworm-slim AS build
+
+WORKDIR /app
+
+ARG VITE_API_URL
+ARG VITE_SERVER_URL
+
+COPY . .
+
+# Grava .env.production para garantir que o Vite embuta as URLs no bundle,
+# independente de como o builder repassa o ambiente.
+RUN printf 'VITE_API_URL=%s\nVITE_SERVER_URL=%s\n' "$VITE_API_URL" "$VITE_SERVER_URL" \
+      > apps/web/.env.production \
+ && npm ci \
+ && npm run build -w @talkhub/shared \
+ && npm run build -w @talkhub/web
+
+# Runtime: nginx servindo apps/web/dist com fallback de SPA.
+FROM nginx:1.27-alpine
+COPY infra/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+EXPOSE 80
