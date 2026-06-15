@@ -18,6 +18,15 @@ import {
 import { AvatarEditor } from "./AvatarEditor";
 import { MapEditor } from "./MapEditor";
 import { GameView } from "./GameView";
+import {
+  PixelBadge,
+  PixelButton,
+  PixelHeading,
+  PixelInput,
+  PixelPanel,
+  PixelSelect,
+  PixelToolbar,
+} from "./ui";
 
 type View =
   | { name: "list" }
@@ -53,23 +62,61 @@ export function App() {
     if (ambienteId) setView({ name: "game", ambienteId });
   };
 
-  if (loading) return <Shell>Carregando…</Shell>;
+  if (loading)
+    return (
+      <Shell>
+        <div style={{ display: "flex", justifyContent: "center", padding: "var(--sp-7) 0" }}>
+          <PixelPanel tone="inset" style={{ textAlign: "center" }}>
+            <span
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "var(--fs-d-md)",
+                color: "var(--c-ink-dim)",
+              }}
+            >
+              Carregando o mundo…
+            </span>
+          </PixelPanel>
+        </div>
+      </Shell>
+    );
   if (!user)
     return (
       <Shell>
-        <Login onLogin={setUser} />
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <Login onLogin={setUser} />
+        </div>
       </Shell>
     );
 
   return (
     <Shell>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span>
-          Olá, <strong>{user.displayName}</strong> ({user.kind})
+      <header
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: "var(--sp-3)",
+          marginBottom: "var(--sp-5)",
+        }}
+      >
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "var(--sp-2)",
+            fontSize: "var(--fs-sm)",
+          }}
+        >
+          Olá, <strong>{user.displayName}</strong>
+          <PixelBadge tone={user.kind === "google" ? "info" : "muted"}>
+            {user.kind === "google" ? "google" : "convidado"}
+          </PixelBadge>
         </span>
-        <button onClick={logout} style={{ cursor: "pointer" }}>
+        <PixelButton variant="ghost" size="sm" onClick={logout}>
           Sair
-        </button>
+        </PixelButton>
       </header>
 
       {view.name === "list" && (
@@ -81,15 +128,21 @@ export function App() {
         />
       )}
       {view.name === "avatar" && (
-        <section>
-          <button onClick={() => setView({ name: "list" })}>← Voltar</button>
-          <h2>Seu personagem (16×16)</h2>
+        <section style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
+          <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center" }}>
+            <PixelButton variant="ghost" size="sm" onClick={() => setView({ name: "list" })}>
+              ← Voltar
+            </PixelButton>
+            <PixelHeading as="h2">Seu personagem (16×16)</PixelHeading>
+          </div>
           <AvatarEditor />
         </section>
       )}
       {view.name === "create" && (
-        <section>
-          <h2>{view.serverId ? "Adicionar ambiente" : "Criar servidor"}</h2>
+        <section style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
+          <PixelHeading as="h2">
+            {view.serverId ? "Adicionar ambiente" : "Criar servidor"}
+          </PixelHeading>
           <MapEditor
             serverId={view.serverId}
             onSaved={(serverId) => setView({ name: "manage", serverId })}
@@ -140,61 +193,119 @@ function ServerList({
   }, []);
 
   return (
-    <section>
-      <div style={{ display: "flex", gap: 8, margin: "12px 0" }}>
-        <button onClick={onCreate} style={{ padding: "8px 12px" }}>
+    <section style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
+      <PixelToolbar>
+        <PixelButton variant="primary" onClick={onCreate}>
           + Criar servidor
-        </button>
-        <button onClick={onEditAvatar} style={{ padding: "8px 12px" }}>
-          Editar avatar
-        </button>
-      </div>
-      <h2>Servidores ativos</h2>
+        </PixelButton>
+        <PixelButton variant="default" onClick={onEditAvatar}>
+          ✎ Editar avatar
+        </PixelButton>
+      </PixelToolbar>
+      <PixelHeading as="h2">Servidores ativos</PixelHeading>
       {servers === null ? (
-        <p>Carregando…</p>
+        <div>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              display: "grid",
+              gap: "var(--sp-3)",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+            }}
+          >
+            {[0, 1, 2, 3].map((i) => (
+              <li key={i}>
+                <PixelPanel tone="inset" style={{ minHeight: 170 }} aria-hidden>
+                  <div
+                    style={{
+                      width: "100%",
+                      height: 90,
+                      background: "var(--c-panel)",
+                      border: "var(--bw-thin) solid var(--c-border)",
+                    }}
+                  />
+                </PixelPanel>
+              </li>
+            ))}
+          </ul>
+          <p style={{ color: "var(--c-ink-dim)", marginTop: "var(--sp-3)" }}>Procurando mundos…</p>
+        </div>
       ) : servers.length === 0 ? (
-        <p>Nenhum servidor ainda. Crie o primeiro!</p>
+        <PixelPanel
+          tone="inset"
+          style={{
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "var(--sp-3)",
+          }}
+        >
+          <span style={{ fontSize: 40, lineHeight: 1 }}>🗺️</span>
+          <p style={{ color: "var(--c-ink-dim)" }}>
+            Nenhum mundo por aqui ainda. Crie o primeiro!
+          </p>
+          <PixelButton variant="primary" onClick={onCreate}>
+            + Criar servidor
+          </PixelButton>
+        </PixelPanel>
       ) : (
         <ul
           style={{
             listStyle: "none",
             padding: 0,
+            margin: 0,
             display: "grid",
-            gap: 12,
+            gap: "var(--sp-3)",
             gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
           }}
         >
           {servers.map((s) => (
-            <li
-              key={s.id}
-              onClick={() => onEnter(s.firstAmbienteId)}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: 8,
-                padding: 12,
-                cursor: "pointer",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
-              {s.firstAmbienteId && <ServerPreview ambienteId={s.firstAmbienteId} />}
-              <div>
-                <strong>{s.name}</strong>
-                <div style={{ fontSize: 13, color: "#666" }}>por {s.ownerName}</div>
-                <div style={{ fontSize: 12, color: s.playerCount > 0 ? "#1a8a3a" : "#999" }}>
-                  ● {s.playerCount} online · {s.ambienteCount} ambiente(s)
-                </div>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onManage(s.id);
+            <li key={s.id}>
+              <PixelPanel
+                tone="raised"
+                role="button"
+                tabIndex={0}
+                onClick={() => onEnter(s.firstAmbienteId)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onEnter(s.firstAmbienteId);
+                  }
                 }}
-                style={{ alignSelf: "flex-start", fontSize: 12 }}
+                style={{
+                  cursor: "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "var(--sp-2)",
+                  height: "100%",
+                }}
               >
-                ⚙ Gerenciar
-              </button>
+                {s.firstAmbienteId && <ServerPreview ambienteId={s.firstAmbienteId} />}
+                <PixelHeading as="h3">{s.name}</PixelHeading>
+                <div style={{ fontSize: "var(--fs-sm)", color: "var(--c-ink-dim)" }}>
+                  por {s.ownerName}
+                </div>
+                <div>
+                  <PixelBadge tone={s.playerCount > 0 ? "online" : "muted"}>
+                    {s.playerCount > 0 && <span className="px-badge__dot" />}
+                    {s.playerCount} online · {s.ambienteCount} ambiente(s)
+                  </PixelBadge>
+                </div>
+                <PixelButton
+                  variant="ghost"
+                  size="sm"
+                  style={{ alignSelf: "flex-start" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onManage(s.id);
+                  }}
+                >
+                  ⚙ Gerenciar
+                </PixelButton>
+              </PixelPanel>
             </li>
           ))}
         </ul>
@@ -248,9 +359,8 @@ function ServerPreview({ ambienteId }: { ambienteId: string }) {
         height: 90,
         objectFit: "contain",
         imageRendering: "pixelated",
-        background: "#fafafa",
-        border: "1px solid #eee",
-        borderRadius: 4,
+        background: "var(--c-panel)",
+        border: "var(--bw-thin) solid var(--c-border)",
       }}
     />
   );
@@ -274,36 +384,69 @@ function ManageServer({
   }, [serverId]);
 
   return (
-    <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        <button onClick={onBack}>← Voltar</button>
-        <h2 style={{ margin: 0 }}>Gerenciar servidor</h2>
+    <section style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
+      <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center" }}>
+        <PixelButton variant="ghost" size="sm" onClick={onBack}>
+          ← Voltar
+        </PixelButton>
+        <PixelHeading as="h2">Gerenciar servidor</PixelHeading>
       </div>
 
-      <div>
-        <h3>Ambientes</h3>
-        <ul style={{ listStyle: "none", padding: 0, display: "grid", gap: 6 }}>
-          {ambientes?.map((a) => (
-            <li key={a.id} style={{ border: "1px solid #eee", borderRadius: 6, padding: 8 }}>
-              <strong>{a.name}</strong> ({a.wCells}×{a.hCells}) · raio {a.chatRadius}{" "}
-              <button onClick={() => onEnter(a.id)} style={{ marginLeft: 8 }}>
-                Entrar
-              </button>
+      <PixelPanel title="Ambientes" tone="raised">
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "var(--sp-2)" }}>
+          {ambientes === null ? (
+            <li>
+              <span style={{ color: "var(--c-ink-dim)" }}>Carregando ambientes…</span>
             </li>
-          ))}
+          ) : (
+            ambientes.map((a) => (
+              <li key={a.id}>
+                <PixelPanel
+                  tone="inset"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "var(--sp-2)",
+                    padding: "var(--sp-2) var(--sp-3)",
+                  }}
+                >
+                  <strong style={{ fontFamily: "var(--font-display)", fontSize: "var(--fs-d-sm)" }}>
+                    {a.name}
+                  </strong>
+                  <PixelBadge tone="muted">
+                    {a.wCells}×{a.hCells}
+                  </PixelBadge>
+                  <PixelBadge tone="info">raio {a.chatRadius}</PixelBadge>
+                  <PixelButton
+                    variant="primary"
+                    size="sm"
+                    style={{ marginLeft: "auto" }}
+                    onClick={() => onEnter(a.id)}
+                  >
+                    Entrar
+                  </PixelButton>
+                </PixelPanel>
+              </li>
+            ))
+          )}
         </ul>
-        <button onClick={onAddAmbiente} style={{ padding: "6px 10px" }}>
-          + Adicionar ambiente
-        </button>
-      </div>
+        <div style={{ marginTop: "var(--sp-3)" }}>
+          <PixelButton variant="default" onClick={onAddAmbiente}>
+            + Adicionar ambiente
+          </PixelButton>
+        </div>
+      </PixelPanel>
 
       {ambientes && ambientes.length >= 2 && (
         <PortalForm ambientes={ambientes} onCreated={reload} />
       )}
       {ambientes && ambientes.length < 2 && (
-        <p style={{ fontSize: 13, color: "#888" }}>
-          Adicione um segundo ambiente para poder criar portais entre eles.
-        </p>
+        <PixelPanel tone="inset">
+          <p style={{ color: "var(--c-ink-dim)" }}>
+            Adicione um segundo ambiente para criar portais entre eles.
+          </p>
+        </PixelPanel>
       )}
     </section>
   );
@@ -341,42 +484,95 @@ function PortalForm({
 
   const num = (v: string) => Math.max(0, Math.round(Number(v) || 0));
 
+  const fieldLabel = {
+    fontFamily: "var(--font-display)",
+    fontSize: "var(--fs-d-sm)",
+    color: "var(--c-ink-dim)",
+  } as const;
+
   return (
-    <div style={{ border: "1px solid #eee", borderRadius: 6, padding: 10, display: "grid", gap: 6 }}>
-      <h3 style={{ margin: 0 }}>Criar portal</h3>
-      <label>
-        De:{" "}
-        <select value={from} onChange={(e) => setFrom(e.target.value)}>
-          {ambientes.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>{" "}
-        na célula x
-        <input type="number" value={cell.x} onChange={(e) => setCell({ ...cell, x: num(e.target.value) })} style={{ width: 56 }} />
-        y
-        <input type="number" value={cell.y} onChange={(e) => setCell({ ...cell, y: num(e.target.value) })} style={{ width: 56 }} />
-      </label>
-      <label>
-        Para:{" "}
-        <select value={to} onChange={(e) => setTo(e.target.value)}>
-          {ambientes.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>{" "}
-        spawn x
-        <input type="number" value={spawn.x} onChange={(e) => setSpawn({ ...spawn, x: num(e.target.value) })} style={{ width: 56 }} />
-        y
-        <input type="number" value={spawn.y} onChange={(e) => setSpawn({ ...spawn, y: num(e.target.value) })} style={{ width: 56 }} />
-      </label>
-      <div>
-        <button onClick={create}>Criar portal</button>
-        {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
+    <PixelPanel title="Criar portal" tone="raised">
+      <div style={{ display: "grid", gap: "var(--sp-3)" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "var(--sp-2)",
+          }}
+        >
+          <span style={fieldLabel}>Sai de</span>
+          <PixelSelect
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            style={{ width: "auto", minWidth: 120 }}
+          >
+            {ambientes.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </PixelSelect>
+          <span style={fieldLabel}>na célula x</span>
+          <PixelInput
+            type="number"
+            value={cell.x}
+            onChange={(e) => setCell({ ...cell, x: num(e.target.value) })}
+            style={{ width: 72 }}
+          />
+          <span style={fieldLabel}>y</span>
+          <PixelInput
+            type="number"
+            value={cell.y}
+            onChange={(e) => setCell({ ...cell, y: num(e.target.value) })}
+            style={{ width: 72 }}
+          />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "var(--sp-2)",
+          }}
+        >
+          <span style={fieldLabel}>Chega em</span>
+          <PixelSelect
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            style={{ width: "auto", minWidth: 120 }}
+          >
+            {ambientes.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </PixelSelect>
+          <span style={fieldLabel}>spawn x</span>
+          <PixelInput
+            type="number"
+            value={spawn.x}
+            onChange={(e) => setSpawn({ ...spawn, x: num(e.target.value) })}
+            style={{ width: 72 }}
+          />
+          <span style={fieldLabel}>y</span>
+          <PixelInput
+            type="number"
+            value={spawn.y}
+            onChange={(e) => setSpawn({ ...spawn, y: num(e.target.value) })}
+            style={{ width: 72 }}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+          <PixelButton variant="primary" onClick={create}>
+            Criar portal
+          </PixelButton>
+          {msg && (
+            <PixelBadge tone={msg === "Portal criado!" ? "online" : "warn"}>{msg}</PixelBadge>
+          )}
+        </div>
       </div>
-    </div>
+    </PixelPanel>
   );
 }
 
@@ -384,6 +580,7 @@ function Login({ onLogin }: { onLogin: (u: PublicUser) => void }) {
   const [name, setName] = useState("");
   const [google, setGoogle] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
 
   useEffect(() => {
     googleAvailable().then(setGoogle);
@@ -391,45 +588,86 @@ function Login({ onLogin }: { onLogin: (u: PublicUser) => void }) {
 
   const guest = async () => {
     setBusy(true);
+    setErr(false);
     try {
       onLogin(await loginGuest(name.trim() || undefined));
+    } catch {
+      setErr(true);
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 360, display: "flex", flexDirection: "column", gap: 12 }}>
-      <h2>Entrar no Talkhub</h2>
-      <input
-        placeholder="Seu nome (opcional)"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        style={{ padding: 8 }}
-      />
-      <button onClick={guest} disabled={busy} style={{ padding: 10, cursor: "pointer" }}>
-        Entrar como convidado
-      </button>
-      {google ? (
-        <a
-          href={googleLoginHref()}
-          style={{ padding: 10, textAlign: "center", border: "1px solid #bbb", borderRadius: 6 }}
+    <PixelPanel title="Entrar no Talkhub" tone="raised" style={{ width: "100%", maxWidth: 360 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+        <PixelInput
+          placeholder="Seu nome (opcional)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !busy) guest();
+          }}
+        />
+        <PixelButton
+          variant="primary"
+          size="md"
+          onClick={guest}
+          disabled={busy}
+          style={{ width: "100%" }}
         >
-          Entrar com Google
-        </a>
-      ) : (
-        <span style={{ fontSize: 12, color: "#888" }}>
-          (Login Google indisponível — configure as credenciais no servidor)
-        </span>
-      )}
-    </div>
+          {busy ? "Entrando…" : "Entrar como convidado"}
+        </PixelButton>
+        {err && (
+          <PixelBadge tone="warn">Não deu para entrar — tente de novo.</PixelBadge>
+        )}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--fs-d-sm)",
+            color: "var(--c-ink-faint)",
+          }}
+        >
+          ou
+        </div>
+        {google ? (
+          <a href={googleLoginHref()} className="px-btn px-btn--default px-btn--md" style={{ width: "100%" }}>
+            Entrar com Google
+          </a>
+        ) : (
+          <PixelPanel tone="inset">
+            <span style={{ fontSize: "var(--fs-sm)", color: "var(--c-ink-dim)" }}>
+              Login Google indisponível no momento — você ainda pode entrar como convidado.
+            </span>
+          </PixelPanel>
+        )}
+      </div>
+    </PixelPanel>
   );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <main style={{ fontFamily: "sans-serif", padding: 24, maxWidth: 900, margin: "0 auto" }}>
-      <h1>Talkhub</h1>
+    <main
+      style={{
+        padding: "var(--sp-5)",
+        maxWidth: 960,
+        margin: "0 auto",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "var(--sp-3)",
+          marginBottom: "var(--sp-5)",
+        }}
+      >
+        <PixelHeading as="h1">Talkhub</PixelHeading>
+      </div>
       {children}
     </main>
   );

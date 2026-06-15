@@ -1,0 +1,294 @@
+/* ============================================================
+   Talkhub — pixel.css
+   Utility/component classes for the pixel primitives.
+   Chunky hard-edged borders, layered box-shadow bevels,
+   tactile :active press, accessible :focus-visible rings.
+   NO border-radius anywhere.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   Button — .px-btn (+ variants & sizes)
+   ------------------------------------------------------------ */
+.px-btn {
+  --btn-fill: var(--c-panel-raised);
+  --btn-ink: var(--c-ink);
+  --btn-deep: var(--c-bevel-dark);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  font-family: var(--font-display);
+  font-size: var(--fs-d-md);
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--btn-ink);
+  background: var(--btn-fill);
+  border: var(--bw) solid var(--c-border);
+  border-radius: 0;
+  padding: 0 var(--sp-4);
+  min-height: var(--tap);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  /* Hard bevel: outer pixel shadow + inner top highlight + inner bottom shade */
+  box-shadow:
+    0 var(--bevel) 0 0 var(--c-border),
+    inset 0 var(--bw) 0 0 rgba(255, 255, 255, 0.18),
+    inset 0 calc(-1 * var(--bw)) 0 0 var(--btn-deep);
+  transition: transform 0.04s steps(1), filter 0.08s linear;
+}
+
+.px-btn:hover {
+  filter: brightness(1.08);
+}
+
+.px-btn:active {
+  /* Press down: move into the bevel and flatten the drop shadow */
+  transform: translateY(var(--bevel));
+  box-shadow:
+    0 0 0 0 var(--c-border),
+    inset 0 var(--bw) 0 0 var(--btn-deep);
+}
+
+.px-btn:focus-visible {
+  outline: none;
+  box-shadow:
+    0 var(--bevel) 0 0 var(--c-border),
+    inset 0 var(--bw) 0 0 rgba(255, 255, 255, 0.18),
+    inset 0 calc(-1 * var(--bw)) 0 0 var(--btn-deep),
+    0 0 0 3px var(--c-bg),
+    0 0 0 6px var(--c-accent-2);
+}
+
+.px-btn:disabled,
+.px-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  filter: grayscale(0.6) brightness(0.7);
+  opacity: 0.7;
+  transform: none;
+  box-shadow:
+    0 var(--bevel) 0 0 var(--c-border),
+    inset 0 var(--bw) 0 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Variants */
+.px-btn--primary {
+  --btn-fill: var(--c-primary);
+  --btn-ink: var(--c-primary-ink);
+  --btn-deep: var(--c-primary-deep);
+}
+.px-btn--default {
+  --btn-fill: var(--c-panel-raised);
+  --btn-ink: var(--c-ink);
+  --btn-deep: var(--c-bevel-dark);
+}
+.px-btn--danger {
+  --btn-fill: var(--c-danger);
+  --btn-ink: var(--c-danger-ink);
+  --btn-deep: var(--c-danger-deep);
+}
+.px-btn--ghost {
+  --btn-fill: transparent;
+  --btn-ink: var(--c-ink);
+  --btn-deep: transparent;
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--c-border);
+}
+.px-btn--ghost:active {
+  transform: translateY(var(--press));
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--c-border),
+    inset 0 var(--bw) 0 0 rgba(0, 0, 0, 0.25);
+}
+.px-btn--ghost:focus-visible {
+  box-shadow:
+    inset 0 0 0 var(--bw) var(--c-border),
+    0 0 0 3px var(--c-bg),
+    0 0 0 6px var(--c-accent-2);
+}
+
+/* Sizes */
+.px-btn--sm {
+  font-size: var(--fs-d-sm);
+  min-height: var(--tap);
+  padding: 0 var(--sp-3);
+}
+.px-btn--md {
+  font-size: var(--fs-d-md);
+}
+
+/* ------------------------------------------------------------
+   Icon button — .px-iconbtn (square, compact)
+   ------------------------------------------------------------ */
+.px-iconbtn {
+  padding: 0;
+  width: var(--tap);
+  min-width: var(--tap);
+  height: var(--tap);
+  font-family: var(--font-body);
+  font-size: var(--fs-lg);
+}
+.px-iconbtn.px-btn--sm {
+  width: var(--tap);
+  min-width: var(--tap);
+  height: var(--tap);
+  font-size: var(--fs-md);
+}
+
+/* ------------------------------------------------------------
+   Panel — .px-panel (+ tones, optional title)
+   ------------------------------------------------------------ */
+.px-panel {
+  --panel-fill: var(--c-panel);
+  position: relative;
+  background: var(--panel-fill);
+  border: var(--bw) solid var(--c-border);
+  border-radius: 0;
+  padding: var(--sp-4);
+  color: var(--c-ink);
+}
+.px-panel--default {
+  --panel-fill: var(--c-panel);
+  box-shadow: 0 var(--bevel) 0 0 var(--c-border);
+}
+.px-panel--raised {
+  --panel-fill: var(--c-panel-raised);
+  box-shadow:
+    0 var(--bevel) 0 0 var(--c-border),
+    inset 0 var(--bw) 0 0 rgba(255, 255, 255, 0.12),
+    inset 0 calc(-1 * var(--bw)) 0 0 rgba(0, 0, 0, 0.25);
+}
+.px-panel--inset {
+  --panel-fill: var(--c-panel-inset);
+  box-shadow:
+    inset 0 var(--bw) 0 0 rgba(0, 0, 0, 0.4),
+    inset 0 calc(-1 * var(--bw)) 0 0 rgba(255, 255, 255, 0.06);
+}
+
+.px-panel__title {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--fs-d-md);
+  color: var(--c-primary);
+  margin: 0 0 var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: var(--bw-thin) solid var(--c-border);
+  text-shadow: 0 2px 0 var(--c-border);
+}
+
+/* ------------------------------------------------------------
+   Inputs — .px-input / .px-select (shared field look)
+   ------------------------------------------------------------ */
+.px-field {
+  display: block;
+  width: 100%;
+  min-height: var(--tap);
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  color: var(--c-ink);
+  background: var(--c-panel-inset);
+  border: var(--bw) solid var(--c-border);
+  border-radius: 0;
+  padding: var(--sp-2) var(--sp-3);
+  box-shadow: inset 0 var(--bw-thin) 0 0 rgba(0, 0, 0, 0.45);
+  transition: box-shadow 0.08s linear, background 0.08s linear;
+}
+.px-field::placeholder {
+  color: var(--c-ink-faint);
+}
+.px-field:hover {
+  background: var(--c-bg-2);
+}
+.px-field:focus-visible {
+  outline: none;
+  background: var(--c-bg-2);
+  box-shadow:
+    inset 0 var(--bw-thin) 0 0 rgba(0, 0, 0, 0.45),
+    0 0 0 3px var(--c-bg),
+    0 0 0 6px var(--c-accent-2);
+}
+.px-field:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Select-specific: chunky custom arrow, room on the right */
+.px-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: var(--sp-6);
+  cursor: pointer;
+  /* Pixel-ish chevron drawn with a conic/linear background */
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--c-ink-dim) 50%),
+    linear-gradient(135deg, var(--c-ink-dim) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 10px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+.px-select option {
+  background: var(--c-panel);
+  color: var(--c-ink);
+}
+
+/* ------------------------------------------------------------
+   Badge — .px-badge (+ tones)
+   ------------------------------------------------------------ */
+.px-badge {
+  --badge-fill: var(--c-muted);
+  --badge-ink: var(--c-muted-ink);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-family: var(--font-display);
+  font-size: var(--fs-d-sm);
+  line-height: 1;
+  color: var(--badge-ink);
+  background: var(--badge-fill);
+  border: var(--bw-thin) solid var(--c-border);
+  border-radius: 0;
+  padding: var(--sp-1) var(--sp-2);
+  box-shadow: 0 2px 0 0 var(--c-border);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.px-badge--online { --badge-fill: var(--c-online); --badge-ink: var(--c-online-ink); }
+.px-badge--muted  { --badge-fill: var(--c-muted);  --badge-ink: var(--c-muted-ink); }
+.px-badge--info   { --badge-fill: var(--c-info);   --badge-ink: var(--c-info-ink); }
+.px-badge--warn   { --badge-fill: var(--c-warn);   --badge-ink: var(--c-warn-ink); }
+
+/* Optional leading dot for status badges */
+.px-badge__dot {
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  display: inline-block;
+}
+
+/* ------------------------------------------------------------
+   Heading — .px-heading (+ levels)
+   ------------------------------------------------------------ */
+.px-heading {
+  font-family: var(--font-display);
+  color: var(--c-ink);
+  line-height: 1.4;
+  text-shadow: 0 3px 0 var(--c-border);
+}
+.px-heading--h1 { font-size: var(--fs-d-xl); color: var(--c-primary); }
+.px-heading--h2 { font-size: var(--fs-d-lg); }
+.px-heading--h3 { font-size: var(--fs-d-md); color: var(--c-ink-dim); text-shadow: 0 2px 0 var(--c-border); }
+
+/* ------------------------------------------------------------
+   Toolbar — .px-toolbar (flex row group)
+   ------------------------------------------------------------ */
+.px-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}

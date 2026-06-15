@@ -1,3 +1,5 @@
+import "./ui/theme.css";
+import "./ui/pixel.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";
