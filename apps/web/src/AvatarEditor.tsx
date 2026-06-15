@@ -10,10 +10,17 @@ import {
   unpackBits,
 } from "@talkhub/shared";
 import { getAvatar, putAvatar } from "./api";
+import { PixelButton, PixelPanel, PixelBadge } from "./ui";
 
 type Tool = "pencil" | "eraser" | "bucket";
 
 const CELL = 22;
+
+const TOOL_LABEL: Record<Tool, string> = {
+  pencil: "Lápis",
+  eraser: "Borracha",
+  bucket: "Balde",
+};
 
 export function AvatarEditor() {
   const [pixels, setPixels] = useState<Uint8Array>(() => randomAvatarPixels());
@@ -106,79 +113,97 @@ export function AvatarEditor() {
     }
   };
 
-  return (
-    <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${AVATAR_SIZE}, ${CELL}px)`,
-          gridTemplateRows: `repeat(${AVATAR_SIZE}, ${CELL}px)`,
-          border: "1px solid #ccc",
-          touchAction: "none",
-          userSelect: "none",
-        }}
-      >
-        {Array.from({ length: AVATAR_PIXELS }, (_, i) => (
-          <div
-            key={i}
-            onPointerDown={() => onDown(i)}
-            onPointerEnter={() => onEnter(i)}
-            style={{
-              width: CELL,
-              height: CELL,
-              background: pixels[i] ? color : "#fafafa",
-              boxShadow: "inset 0 0 0 0.5px #eee",
-              cursor: "crosshair",
-            }}
-          />
-        ))}
-      </div>
+  const saved = msg === "Avatar salvo!";
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 200 }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          {(["pencil", "eraser", "bucket"] as Tool[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTool(t)}
+  return (
+    <div style={{ display: "flex", gap: "var(--sp-5)", flexWrap: "wrap" }}>
+      <PixelPanel tone="inset" style={{ padding: "var(--sp-3)", alignSelf: "flex-start" }}>
+        <div
+          aria-label="Editor de avatar 16 por 16"
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${AVATAR_SIZE}, ${CELL}px)`,
+            gridTemplateRows: `repeat(${AVATAR_SIZE}, ${CELL}px)`,
+            border: "var(--bw) solid var(--c-border)",
+            touchAction: "none",
+            userSelect: "none",
+          }}
+        >
+          {Array.from({ length: AVATAR_PIXELS }, (_, i) => (
+            <div
+              key={i}
+              onPointerDown={() => onDown(i)}
+              onPointerEnter={() => onEnter(i)}
               style={{
-                padding: "6px 10px",
-                fontWeight: tool === t ? 700 : 400,
-                background: tool === t ? "#e0ecff" : "#fff",
-                border: "1px solid #bbb",
-                borderRadius: 6,
-                cursor: "pointer",
+                width: CELL,
+                height: CELL,
+                background: pixels[i] ? color : "var(--c-ink)",
+                boxShadow: "inset 0 0 0 1px rgba(18,12,34,0.22)",
+                cursor: "crosshair",
               }}
+            />
+          ))}
+        </div>
+      </PixelPanel>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)", minWidth: 220 }}>
+        <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+          {(["pencil", "eraser", "bucket"] as Tool[]).map((t) => (
+            <PixelButton
+              key={t}
+              size="sm"
+              variant={tool === t ? "primary" : "default"}
+              aria-pressed={tool === t}
+              onClick={() => setTool(t)}
             >
-              {t === "pencil" ? "Lápis" : t === "eraser" ? "Borracha" : "Balde"}
-            </button>
+              {TOOL_LABEL[t]}
+            </PixelButton>
           ))}
         </div>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          Cor:
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-        </label>
+        <PixelPanel tone="raised" title="Cor">
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--sp-2)",
+              fontFamily: "var(--font-display)",
+              fontSize: "var(--fs-d-sm)",
+            }}
+          >
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              style={{
+                width: 44,
+                height: 44,
+                padding: 0,
+                border: "var(--bw) solid var(--c-border)",
+                background: "var(--c-panel-inset)",
+                cursor: "pointer",
+              }}
+            />
+            <span>{color.toUpperCase()}</span>
+          </label>
+        </PixelPanel>
 
-        <button onClick={() => setPixels(randomAvatarPixels())} style={btn}>
+        <PixelButton variant="default" onClick={() => setPixels(randomAvatarPixels())}>
           Gerar aleatório
-        </button>
-        <button onClick={() => setPixels(new Uint8Array(AVATAR_PIXELS))} style={btn}>
+        </PixelButton>
+        <PixelButton variant="default" onClick={() => setPixels(new Uint8Array(AVATAR_PIXELS))}>
           Limpar
-        </button>
+        </PixelButton>
 
-        <button onClick={save} disabled={saving} style={{ ...btn, background: "#2563eb", color: "#fff" }}>
+        <PixelButton variant="primary" onClick={save} disabled={saving}>
           {saving ? "Salvando..." : "Salvar avatar"}
-        </button>
-        {msg && <span style={{ fontSize: 13 }}>{msg}</span>}
+        </PixelButton>
+        {msg && (
+          <PixelBadge tone={saved ? "online" : "warn"}>
+            {saved ? "Avatar salvo!" : "Não deu para salvar — tente de novo."}
+          </PixelBadge>
+        )}
       </div>
     </div>
   );
 }
-
-const btn: React.CSSProperties = {
-  padding: "8px 10px",
-  border: "1px solid #bbb",
-  borderRadius: 6,
-  background: "#fff",
-  cursor: "pointer",
-};

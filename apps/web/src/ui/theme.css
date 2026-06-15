@@ -1,0 +1,191 @@
+/* ============================================================
+   Talkhub — theme.css
+   Global design tokens, CSS reset/base, scrollbar & selection.
+   Retro pixel-game look: warm, playful, accessible contrast.
+   ============================================================ */
+
+:root {
+  /* ---- Color palette (retro, warm, accessible) ------------- */
+  /* Surfaces */
+  --c-bg:        #1f1633; /* deep purple night sky */
+  --c-bg-2:      #2a1f47; /* slightly lighter backdrop */
+  --c-panel:     #3a2d5c; /* default panel fill */
+  --c-panel-raised: #4a3a72; /* raised/highlighted panel */
+  --c-panel-inset:  #281e44; /* inset/recessed panel */
+  --c-ink:       #f4ecd8; /* primary text (warm parchment) */
+  --c-ink-dim:   #b9add0; /* secondary/muted text */
+  --c-ink-faint: #7d6fa3; /* tertiary / placeholder text */
+
+  /* Borders / bevels */
+  --c-border:      #120c22; /* hard outer pixel border (near-black) */
+  --c-bevel-light: #6a5896; /* top/left highlight for raised */
+  --c-bevel-dark:  #160f2b; /* bottom/right shadow */
+
+  /* Brand & accents */
+  --c-primary:      #f9c22e; /* sunny gold — primary action */
+  --c-primary-ink:  #2a1f06; /* text on primary */
+  --c-primary-deep: #c8941a; /* primary pressed shade */
+  --c-accent:       #ff5d8f; /* hot pink accent */
+  --c-accent-2:     #36d6c3; /* teal accent */
+  --c-danger:       #ff5247; /* danger / destructive red */
+  --c-danger-ink:   #fff2f0;
+  --c-danger-deep:  #c0271e;
+
+  /* Status (badges) */
+  --c-online:   #5ce06b; /* online green */
+  --c-online-ink: #0c2a10;
+  --c-info:     #5db8ff; /* info blue */
+  --c-info-ink: #06223d;
+  --c-warn:     #ffb02e; /* warn amber */
+  --c-warn-ink: #3a2604;
+  --c-muted:    #6c5f8e; /* muted gray-violet */
+  --c-muted-ink:#efe9fb;
+
+  /* ---- Typography ----------------------------------------- */
+  --font-display: "Press Start 2P", "Silkscreen", monospace;
+  --font-body:    "VT323", "Silkscreen", "Press Start 2P", monospace;
+
+  /* Body uses VT323 which renders small; bump base size for readability */
+  --fs-xs:  14px;
+  --fs-sm:  17px;
+  --fs-md:  20px;
+  --fs-lg:  24px;
+  --fs-xl:  30px;
+
+  /* Display (Press Start 2P) sizes — kept small, this font is dense */
+  --fs-d-sm: 10px;
+  --fs-d-md: 13px;
+  --fs-d-lg: 18px;
+  --fs-d-xl: 26px;
+
+  /* ---- Spacing scale (8px pixel grid) --------------------- */
+  --sp-0: 0;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* ---- Borders & bevel offsets ---------------------------- */
+  --bw: 3px;            /* chunky pixel border width */
+  --bw-thin: 2px;
+  --bevel: 4px;         /* drop-shadow offset for raised look */
+  --press: 2px;        /* :active translate distance */
+
+  /* ---- Shadows (hard-edged, no blur = pixel feel) --------- */
+  --shadow-hard: 0 var(--bevel) 0 0 var(--c-border);
+  --shadow-hard-sm: 0 2px 0 0 var(--c-border);
+
+  /* ---- Focus ring ----------------------------------------- */
+  --focus: 0 0 0 3px var(--c-bg), 0 0 0 6px var(--c-accent-2);
+
+  /* ---- Tap target ----------------------------------------- */
+  --tap: 40px;
+}
+
+/* ============================================================
+   Reset / base
+   ============================================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--c-bg);
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(255, 93, 143, 0.08), transparent 45%),
+    radial-gradient(circle at 80% 100%, rgba(54, 214, 195, 0.08), transparent 45%);
+  background-attachment: fixed;
+  color: var(--c-ink);
+  font-family: var(--font-body);
+  font-size: var(--fs-md);
+  line-height: 1.35;
+  /* Keep text crisp & anti-aliased (do NOT pixelate text) */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Pixel-art media stays crisp. Note: this targets imagery, NOT text. */
+canvas,
+img.pixelated,
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Headings use the display font by default */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+a {
+  color: var(--c-accent-2);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Remove blurry default focus, primitives provide :focus-visible rings */
+:focus {
+  outline: none;
+}
+
+/* ============================================================
+   Selection
+   ============================================================ */
+::selection {
+  background: var(--c-accent);
+  color: var(--c-bg);
+}
+
+/* ============================================================
+   Scrollbars (chunky retro)
+   ============================================================ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-bevel-light) var(--c-panel-inset);
+}
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--c-panel-inset);
+  border-left: var(--bw-thin) solid var(--c-border);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--c-bevel-light);
+  border: var(--bw-thin) solid var(--c-border);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--c-accent);
+}
+*::-webkit-scrollbar-corner {
+  background: var(--c-panel-inset);
+}

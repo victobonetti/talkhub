@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Client, type Room } from "colyseus.js";
 import {
+  PixelButton,
+  PixelBadge,
+  PixelPanel,
+  PixelInput,
+  type PixelBadgeTone,
+} from "./ui";
+import {
   AVATAR_SIZE,
   CELL_SIZE,
   MAX_LISTENERS_SHOWN,
@@ -69,10 +76,8 @@ function DPad({ onMove }: { onMove: (dir: Dir) => void }) {
   const btn: React.CSSProperties = {
     width: 52,
     height: 52,
+    minWidth: 52,
     fontSize: 22,
-    borderRadius: 8,
-    border: "1px solid #bbb",
-    background: "#fff",
     touchAction: "none",
   };
   const press = (dir: Dir) => (e: React.PointerEvent) => {
@@ -80,13 +85,13 @@ function DPad({ onMove }: { onMove: (dir: Dir) => void }) {
     onMove(dir);
   };
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 52px)", gap: 6, justifyContent: "center", marginTop: 8 }}>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 52px)", gap: "var(--sp-1)", justifyContent: "center", marginTop: "var(--sp-2)" }}>
       <span />
-      <button style={btn} onPointerDown={press("up")}>↑</button>
+      <button type="button" className="px-btn px-btn--default px-iconbtn" style={btn} onPointerDown={press("up")}>↑</button>
       <span />
-      <button style={btn} onPointerDown={press("left")}>←</button>
-      <button style={btn} onPointerDown={press("down")}>↓</button>
-      <button style={btn} onPointerDown={press("right")}>→</button>
+      <button type="button" className="px-btn px-btn--default px-iconbtn" style={btn} onPointerDown={press("left")}>←</button>
+      <button type="button" className="px-btn px-btn--default px-iconbtn" style={btn} onPointerDown={press("down")}>↓</button>
+      <button type="button" className="px-btn px-btn--default px-iconbtn" style={btn} onPointerDown={press("right")}>→</button>
     </div>
   );
 }
@@ -99,7 +104,14 @@ function AvatarThumb({ payload, size = 22 }: { payload?: AvatarPayload; size?: n
   if (!payload)
     return (
       <span
-        style={{ display: "inline-block", width: size, height: size, background: "#bbb", borderRadius: 3 }}
+        style={{
+          display: "inline-block",
+          width: size,
+          height: size,
+          background: "var(--c-muted)",
+          border: "var(--bw-thin) solid var(--c-border)",
+          verticalAlign: "middle",
+        }}
       />
     );
   return (
@@ -107,7 +119,13 @@ function AvatarThumb({ payload, size = 22 }: { payload?: AvatarPayload; size?: n
       ref={ref}
       width={AVATAR_SIZE}
       height={AVATAR_SIZE}
-      style={{ width: size, height: size, imageRendering: "pixelated", verticalAlign: "middle" }}
+      style={{
+        width: size,
+        height: size,
+        imageRendering: "pixelated",
+        verticalAlign: "middle",
+        border: "var(--bw-thin) solid var(--c-border)",
+      }}
     />
   );
 }
@@ -324,13 +342,38 @@ export function GameView({
 
   const extra = nearby.length - MAX_LISTENERS_SHOWN;
 
+  const statusTone: PixelBadgeTone = status.startsWith("erro:")
+    ? "warn"
+    : status === "conectado"
+      ? "online"
+      : "info";
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <button onClick={onExit}>← Sair</button>
-        <span style={{ fontSize: 13, color: "#666" }}>{status}</span>
-        <span style={{ fontSize: 12, color: "#999" }}>setas = andar · digite e Enter = falar</span>
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+      <PixelPanel
+        tone="raised"
+        style={{
+          display: "flex",
+          gap: "var(--sp-3)",
+          alignItems: "center",
+          flexWrap: "wrap",
+          padding: "var(--sp-2) var(--sp-3)",
+        }}
+      >
+        <PixelButton variant="ghost" size="sm" onClick={onExit}>
+          ← Sair
+        </PixelButton>
+        <PixelBadge tone={statusTone}>{status}</PixelBadge>
+        <span
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "var(--fs-sm)",
+            color: "var(--c-ink-dim)",
+          }}
+        >
+          {isMobile ? "toque no D-pad · Enter = falar" : "setas = andar · digite e Enter = falar"}
+        </span>
+      </PixelPanel>
 
       <div
         style={{
@@ -341,40 +384,64 @@ export function GameView({
         }}
       >
         {/* Mapa + barra de ouvintes */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ position: "relative", width: wpx * scale, height: hpx * scale }}>
-            <canvas
-              ref={mapCanvas}
-              width={wpx}
-              height={hpx}
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+          <PixelPanel
+            tone="inset"
+            style={{ padding: 0, lineHeight: 0, width: "fit-content" }}
+          >
+            <div style={{ position: "relative", width: wpx * scale, height: hpx * scale }}>
+              <canvas
+                ref={mapCanvas}
+                width={wpx}
+                height={hpx}
+                style={{
+                  position: "absolute",
+                  width: wpx * scale,
+                  height: hpx * scale,
+                  imageRendering: "pixelated",
+                  border: "var(--bw) solid var(--c-border)",
+                }}
+              />
+              <canvas
+                ref={playersCanvas}
+                width={wpx * scale}
+                height={hpx * scale}
+                style={{ position: "absolute", width: wpx * scale, height: hpx * scale }}
+              />
+            </div>
+          </PixelPanel>
+          <div
+            className="px-toolbar"
+            style={{
+              minHeight: 44,
+              gap: "var(--sp-2)",
+              background: "var(--c-panel-inset)",
+              border: "var(--bw-thin) solid var(--c-border)",
+              padding: "var(--sp-1) var(--sp-2)",
+            }}
+          >
+            <span
               style={{
-                position: "absolute",
-                width: wpx * scale,
-                height: hpx * scale,
-                imageRendering: "pixelated",
-                border: "1px solid #ccc",
+                fontFamily: "var(--font-display)",
+                fontSize: "var(--fs-d-sm)",
+                color: "var(--c-ink-dim)",
+                marginRight: "var(--sp-1)",
               }}
-            />
-            <canvas
-              ref={playersCanvas}
-              width={wpx * scale}
-              height={hpx * scale}
-              style={{ position: "absolute", width: wpx * scale, height: hpx * scale }}
-            />
-          </div>
-          <div style={{ display: "flex", gap: 4, alignItems: "center", minHeight: 26 }}>
-            <span style={{ fontSize: 12, color: "#777", marginRight: 4 }}>Ouvindo:</span>
-            {nearby.length === 0 && <span style={{ fontSize: 12, color: "#aaa" }}>ninguém por perto</span>}
+            >
+              Ouvindo:
+            </span>
+            {nearby.length === 0 && <PixelBadge tone="muted">ninguém por perto</PixelBadge>}
             {nearby.slice(0, MAX_LISTENERS_SHOWN).map((id) => (
               <AvatarThumb key={id} payload={avatars.get(id)} size={22} />
             ))}
-            {extra > 0 && <span style={{ fontSize: 13, fontWeight: 700 }}>+{extra}</span>}
+            {extra > 0 && <PixelBadge tone="info">+{extra}</PixelBadge>}
           </div>
           {isMobile && <DPad onMove={sendMove} />}
         </div>
 
         {/* Chat */}
-        <div
+        <PixelPanel
+          tone="raised"
           style={{
             flex: 1,
             minWidth: 260,
@@ -382,33 +449,56 @@ export function GameView({
             display: "flex",
             flexDirection: "column",
             height: isMobile ? 280 : hpx * scale,
+            padding: "var(--sp-2)",
           }}
         >
           <div
             style={{
               flex: 1,
               overflowY: "auto",
-              border: "1px solid #ddd",
-              borderRadius: 6,
-              padding: 8,
+              background: "var(--c-panel-inset)",
+              border: "var(--bw-thin) solid var(--c-border)",
+              boxShadow: "inset 0 var(--bw-thin) 0 0 rgba(0,0,0,0.4)",
+              padding: "var(--sp-2)",
               display: "flex",
               flexDirection: "column",
-              gap: 6,
+              gap: "var(--sp-2)",
             }}
           >
+            {messages.length === 0 && (
+              <span
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "var(--fs-sm)",
+                  color: "var(--c-ink-dim)",
+                }}
+              >
+                Ninguém falou ainda. Chegue perto de alguém e diga oi!
+              </span>
+            )}
             {messages.map((m) => (
-              <div key={m.key} style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
+              <div key={m.key} style={{ display: "flex", gap: "var(--sp-2)", alignItems: "flex-start" }}>
                 <AvatarThumb payload={avatars.get(m.fromId)} size={20} />
-                <div style={{ fontSize: 13 }}>
-                  <strong>{m.displayName}:</strong> {m.text}
+                <div style={{ fontFamily: "var(--font-body)", fontSize: "var(--fs-sm)", color: "var(--c-ink)" }}>
+                  <strong
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: "var(--fs-d-sm)",
+                      color: "var(--c-primary)",
+                      marginRight: "var(--sp-1)",
+                    }}
+                  >
+                    {m.displayName}:
+                  </strong>
+                  {m.text}
                 </div>
               </div>
             ))}
           </div>
-          <input
+          <PixelInput
             autoFocus
             value={draft}
-            placeholder="Mensagem (só quem está no seu raio recebe)"
+            placeholder="Fala algo… (só quem está no seu raio recebe)"
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -416,9 +506,9 @@ export function GameView({
                 send();
               }
             }}
-            style={{ marginTop: 6, padding: 8 }}
+            style={{ marginTop: "var(--sp-2)" }}
           />
-        </div>
+        </PixelPanel>
       </div>
     </div>
   );

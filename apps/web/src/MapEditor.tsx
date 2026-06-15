@@ -12,11 +12,24 @@ import {
   packBitset,
 } from "@talkhub/shared";
 import { addAmbiente, createServer } from "./api";
+import { PixelButton, PixelPanel, PixelInput, PixelBadge, PixelToolbar } from "./ui";
 
 type Mode = "art" | "collision" | "spawn" | "radius";
 type Tool = "pencil" | "eraser" | "bucket";
 
 const DEFAULT_PALETTE = ["#2b2b2b", "#ffffff", "#6abf69", "#4a90d9", "#d98b4a", "#c0504d"];
+
+const MODE_LABEL: Record<Mode, string> = {
+  art: "Arte",
+  collision: "Colisão",
+  spawn: "Spawn",
+  radius: "Raio",
+};
+const TOOL_LABEL: Record<Tool, string> = {
+  pencil: "Lápis",
+  eraser: "Borracha",
+  bucket: "Balde",
+};
 
 function hexToRgb(hex: string): [number, number, number] {
   return [
@@ -227,81 +240,126 @@ export function MapEditor({
     [mode],
   );
 
+  const numberFieldStyle = { width: 72 } as const;
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={onCancel}>← Voltar</button>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+      <PixelToolbar>
+        <PixelButton variant="ghost" size="sm" onClick={onCancel}>
+          ← Voltar
+        </PixelButton>
         {!serverId && (
-          <input
+          <PixelInput
             placeholder="Nome do servidor"
             value={serverName}
             onChange={(e) => setServerName(e.target.value)}
-            style={{ padding: 6 }}
+            style={{ width: 200 }}
           />
         )}
-        <input
+        <PixelInput
           placeholder="Nome do ambiente"
           value={ambienteName}
           onChange={(e) => setAmbienteName(e.target.value)}
-          style={{ padding: 6, width: 130 }}
+          style={{ width: 160 }}
         />
-        <label>
-          L:
-          <input
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--sp-2)",
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--fs-d-sm)",
+          }}
+        >
+          Larg.
+          <PixelInput
             type="number"
             min={MIN_WORLD_CELLS}
             max={MAX_WORLD_CELLS}
             value={wCells}
             onChange={(e) => setWCells(clampCells(e.target.value))}
-            style={{ width: 56 }}
+            style={numberFieldStyle}
           />
         </label>
-        <label>
-          A:
-          <input
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--sp-2)",
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--fs-d-sm)",
+          }}
+        >
+          Alt.
+          <PixelInput
             type="number"
             min={MIN_WORLD_CELLS}
             max={MAX_WORLD_CELLS}
             value={hCells}
             onChange={(e) => setHCells(clampCells(e.target.value))}
-            style={{ width: 56 }}
+            style={numberFieldStyle}
           />
         </label>
-        <span style={{ fontSize: 12, color: "#777" }}>
-          ({wpx}×{hpx}px)
-        </span>
-      </div>
+        <PixelBadge tone="muted">
+          {wpx}×{hpx}px
+        </PixelBadge>
+      </PixelToolbar>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <PixelToolbar>
         {(["art", "collision", "spawn", "radius"] as Mode[]).map((m) => (
-          <button
+          <PixelButton
             key={m}
+            size="sm"
+            variant={mode === m ? "primary" : "default"}
+            aria-pressed={mode === m}
             onClick={() => setMode(m)}
-            style={{ fontWeight: mode === m ? 700 : 400, background: mode === m ? "#e0ecff" : "#fff" }}
           >
-            {m === "art" ? "Arte" : m === "collision" ? "Colisão" : m === "spawn" ? "Spawn" : "Raio"}
-          </button>
+            {MODE_LABEL[m]}
+          </PixelButton>
         ))}
+        {(mode === "art" || mode === "collision") && (
+          <span
+            aria-hidden
+            style={{
+              alignSelf: "stretch",
+              width: "var(--bw)",
+              background: "var(--c-border)",
+              margin: "0 var(--sp-1)",
+            }}
+          />
+        )}
         {(mode === "art" || mode === "collision") &&
           tools.map((t) => (
-            <button key={t} onClick={() => setTool(t)} style={{ fontWeight: tool === t ? 700 : 400 }}>
-              {t === "pencil" ? "Lápis" : t === "eraser" ? "Borracha" : "Balde"}
-            </button>
+            <PixelButton
+              key={t}
+              size="sm"
+              variant={tool === t ? "primary" : "default"}
+              aria-pressed={tool === t}
+              onClick={() => setTool(t)}
+            >
+              {TOOL_LABEL[t]}
+            </PixelButton>
           ))}
-      </div>
+      </PixelToolbar>
 
       {mode === "art" && (
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+        <PixelToolbar>
           {palette.map((c, i) => (
             <button
               key={i}
+              type="button"
               onClick={() => setColorIdx(i)}
               title={c}
               style={{
                 width: 24,
                 height: 24,
+                padding: 0,
                 background: c,
-                border: colorIdx === i ? "3px solid #2563eb" : "1px solid #999",
+                cursor: "pointer",
+                border:
+                  colorIdx === i
+                    ? "3px solid var(--c-primary)"
+                    : "var(--bw-thin) solid var(--c-border)",
               }}
             />
           ))}
@@ -312,12 +370,28 @@ export function MapEditor({
               setColorIdx(palette.length);
             }}
             title="Adicionar cor"
+            style={{
+              width: 28,
+              height: 28,
+              padding: 0,
+              border: "var(--bw-thin) solid var(--c-border)",
+              background: "var(--c-panel-inset)",
+              cursor: "pointer",
+            }}
           />
-        </div>
+        </PixelToolbar>
       )}
 
       {mode === "radius" && (
-        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <label
+          style={{
+            display: "flex",
+            gap: "var(--sp-2)",
+            alignItems: "center",
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--fs-d-sm)",
+          }}
+        >
           Raio: {chatRadius} células (≈ {chatRadius * CELL_SIZE}px)
           <input
             type="range"
@@ -325,50 +399,52 @@ export function MapEditor({
             max={MAX_CHAT_RADIUS}
             value={chatRadius}
             onChange={(e) => setChatRadius(Number(e.target.value))}
+            style={{ accentColor: "var(--c-info)" }}
           />
         </label>
       )}
 
-      <div style={{ position: "relative", width: wpx * scale, height: hpx * scale }}>
-        <canvas
-          ref={artCanvas}
-          width={wpx}
-          height={hpx}
-          style={{
-            position: "absolute",
-            width: wpx * scale,
-            height: hpx * scale,
-            imageRendering: "pixelated",
-            background:
-              "repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50% / 16px 16px",
-          }}
-        />
-        <canvas
-          ref={overlay}
-          width={wpx * scale}
-          height={hpx * scale}
-          style={{ position: "absolute", width: wpx * scale, height: hpx * scale, cursor: "crosshair" }}
-          onPointerDown={(e) => {
-            painting.current = true;
-            applyAt(e.clientX, e.clientY);
-          }}
-          onPointerMove={(e) => {
-            if (painting.current && mode !== "radius" && !(mode === "art" && tool === "bucket"))
+      <PixelPanel
+        tone="inset"
+        style={{ alignSelf: "flex-start", padding: "var(--sp-2)", overflow: "auto", maxWidth: "100%" }}
+      >
+        <div style={{ position: "relative", width: wpx * scale, height: hpx * scale }}>
+          <canvas
+            ref={artCanvas}
+            width={wpx}
+            height={hpx}
+            style={{
+              position: "absolute",
+              width: wpx * scale,
+              height: hpx * scale,
+              imageRendering: "pixelated",
+              background:
+                "repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50% / 16px 16px",
+            }}
+          />
+          <canvas
+            ref={overlay}
+            width={wpx * scale}
+            height={hpx * scale}
+            style={{ position: "absolute", width: wpx * scale, height: hpx * scale, cursor: "crosshair" }}
+            onPointerDown={(e) => {
+              painting.current = true;
               applyAt(e.clientX, e.clientY);
-          }}
-        />
-      </div>
+            }}
+            onPointerMove={(e) => {
+              if (painting.current && mode !== "radius" && !(mode === "art" && tool === "bucket"))
+                applyAt(e.clientX, e.clientY);
+            }}
+          />
+        </div>
+      </PixelPanel>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <button
-          onClick={save}
-          disabled={saving}
-          style={{ background: "#2563eb", color: "#fff", padding: "8px 14px", border: 0, borderRadius: 6 }}
-        >
+      <PixelToolbar>
+        <PixelButton variant="primary" onClick={save} disabled={saving}>
           {saving ? "Salvando…" : serverId ? "Adicionar ambiente" : "Salvar servidor"}
-        </button>
-        {msg && <span style={{ fontSize: 13, color: "#c0392b" }}>{msg}</span>}
-      </div>
+        </PixelButton>
+        {msg && <PixelBadge tone="warn">{msg}</PixelBadge>}
+      </PixelToolbar>
     </div>
   );
 }
