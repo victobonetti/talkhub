@@ -150,8 +150,8 @@ export function GameView({
   const [myId, setMyId] = useState("");
   const [vw, setVw] = useState(() => window.innerWidth);
 
-  const mapCanvas = useRef<HTMLCanvasElement>(null);
   const playersCanvas = useRef<HTMLCanvasElement>(null);
+  const mapBuffer = useRef<HTMLCanvasElement | null>(null);
   const roomRef = useRef<Room | null>(null);
   const avatarCache = useRef<Map<string, HTMLCanvasElement>>(new Map());
   const disp = useRef<Map<string, { x: number; y: number }>>(new Map());
@@ -162,8 +162,14 @@ export function GameView({
   const isMobile = vw < 768;
   const wpx = meta ? meta.wCells * CELL_SIZE : 0;
   const hpx = meta ? meta.hCells * CELL_SIZE : 0;
+  // Campo de visão = a área do "raio" ao redor do player (em células), limitada
+  // ao tamanho do mapa. A câmera segue o player — ele NÃO vê o mapa inteiro.
+  const viewWCells = meta ? Math.min(meta.wCells, meta.chatRadius * 2 + 1) : 0;
+  const viewHCells = meta ? Math.min(meta.hCells, meta.chatRadius * 2 + 1) : 0;
+  const vpW = viewWCells * CELL_SIZE;
+  const vpH = viewHCells * CELL_SIZE;
   const maxW = isMobile ? vw - 32 : 560;
-  const scale = meta ? Math.max(1, Math.min(8, Math.floor(maxW / wpx))) : 1;
+  const scale = meta && vpW > 0 ? Math.max(1, Math.min(16, Math.floor(maxW / vpW))) : 1;
 
   useEffect(() => {
     const onResize = () => setVw(window.innerWidth);
@@ -220,10 +226,14 @@ export function GameView({
     };
   }, [ambienteId]);
 
-  // Mapa estático.
+  // Mapa renderizado uma vez num buffer offscreen; a câmera recorta a fatia
+  // visível a cada frame (e amplia conforme o zoom).
   useEffect(() => {
-    if (!meta || !mapCanvas.current) return;
-    const ctx = mapCanvas.current.getContext("2d")!;
+    if (!meta) return;
+    const buf = document.createElement("canvas");
+    buf.width = wpx;
+    buf.height = hpx;
+    const ctx = buf.getContext("2d")!;
     const indices = base64ToBytes(meta.art);
     const img = ctx.createImageData(wpx, hpx);
     for (let i = 0; i < indices.length; i++) {
@@ -243,6 +253,7 @@ export function GameView({
       }
     }
     ctx.putImageData(img, 0, 0);
+    mapBuffer.current = buf;
   }, [meta, wpx, hpx]);
 
   // Teclado: setas movem (sempre), Enter envia o chat, demais teclas digitam.
@@ -258,7 +269,7 @@ export function GameView({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Render dos jogadores com interpolação.
+  // Render: câmera com zoom seguindo o player; recorta a fatia visível do mapa.
   useEffect(() => {
     if (!meta) return;
     let raf = 0;
@@ -267,28 +278,25 @@ export function GameView({
       const room = roomRef.current;
       if (cv && room) {
         const ctx = cv.getContext("2d")!;
+        ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, cv.width, cv.height);
         const players = room.state.players as Map<string, PlayerView>;
         const now = Date.now();
 
-        // destaque do meu raio de chat (sob os jogadores)
+        // Câmera centrada no player (posição interpolada), presa às bordas do mapa.
         const mine = myId ? disp.current.get(myId) : undefined;
-        if (mine && meta) {
-          ctx.beginPath();
-          ctx.arc(
-            (mine.x + CELL_SIZE / 2) * scale,
-            (mine.y + CELL_SIZE / 2) * scale,
-            meta.chatRadius * CELL_SIZE * scale,
-            0,
-            Math.PI * 2,
-          );
-          ctx.fillStyle = "rgba(40,110,240,0.06)";
-          ctx.fill();
-          ctx.strokeStyle = "rgba(40,110,240,0.25)";
-          ctx.lineWidth = 2;
-          ctx.stroke();
+        const camCX = mine ? mine.x + CELL_SIZE / 2 : wpx / 2;
+        const camCY = mine ? mine.y + CELL_SIZE / 2 : hpx / 2;
+        const camX = Math.floor(Math.max(0, Math.min(wpx - vpW, camCX - vpW / 2)));
+        const camY = Math.floor(Math.max(0, Math.min(hpx - vpH, camCY - vpH / 2)));
+
+        // Fundo: fatia visível do mapa, ampliada pelo zoom.
+        const buf = mapBuffer.current;
+        if (buf) {
+          ctx.drawImage(buf, camX, camY, vpW, vpH, 0, 0, vpW * scale, vpH * scale);
         }
 
+        const cell = CELL_SIZE * scale;
         players.forEach((p: PlayerView, id: string) => {
           const tx = p.cellX * CELL_SIZE;
           const ty = p.cellY * CELL_SIZE;
@@ -296,17 +304,22 @@ export function GameView({
           d.x += (tx - d.x) * 0.25;
           d.y += (ty - d.y) * 0.25;
           disp.current.set(id, d);
+
+          // Converte mundo -> tela aplicando a câmera.
+          const sx = (d.x - camX) * scale;
+          const sy = (d.y - camY) * scale;
+          if (sx + cell < 0 || sy + cell < 0 || sx > cv.width || sy > cv.height) return;
+
           const sprite = avatarCache.current.get(id);
-          ctx.imageSmoothingEnabled = false;
           if (sprite) {
-            ctx.drawImage(sprite, d.x * scale, d.y * scale, CELL_SIZE * scale, CELL_SIZE * scale);
+            ctx.drawImage(sprite, sx, sy, cell, cell);
           } else {
             ctx.fillStyle = "#888";
-            ctx.fillRect(d.x * scale, d.y * scale, CELL_SIZE * scale, CELL_SIZE * scale);
+            ctx.fillRect(sx, sy, cell, cell);
           }
           ctx.fillStyle = "#000";
           ctx.font = "10px sans-serif";
-          ctx.fillText(p.displayName, d.x * scale, d.y * scale - 2);
+          ctx.fillText(p.displayName, sx, sy - 2);
 
           // balão de fala (acima do avatar)
           const bubble = bubbles.current.get(id);
@@ -314,9 +327,9 @@ export function GameView({
             const text = bubble.text.length > 40 ? bubble.text.slice(0, 39) + "…" : bubble.text;
             ctx.font = "11px sans-serif";
             const w = ctx.measureText(text).width + 10;
-            const cx = d.x * scale + (CELL_SIZE * scale) / 2;
+            const cx = sx + cell / 2;
             const bx = Math.max(0, cx - w / 2);
-            const by = d.y * scale - 20;
+            const by = sy - 20;
             ctx.fillStyle = "rgba(255,255,255,0.95)";
             ctx.strokeStyle = "#bbb";
             ctx.lineWidth = 1;
@@ -331,7 +344,7 @@ export function GameView({
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [meta, scale, myId]);
+  }, [meta, scale, myId, vpW, vpH, wpx, hpx]);
 
   const send = () => {
     const text = draft.trim();
@@ -389,26 +402,18 @@ export function GameView({
             tone="inset"
             style={{ padding: 0, lineHeight: 0, width: "fit-content" }}
           >
-            <div style={{ position: "relative", width: wpx * scale, height: hpx * scale }}>
-              <canvas
-                ref={mapCanvas}
-                width={wpx}
-                height={hpx}
-                style={{
-                  position: "absolute",
-                  width: wpx * scale,
-                  height: hpx * scale,
-                  imageRendering: "pixelated",
-                  border: "var(--bw) solid var(--c-border)",
-                }}
-              />
-              <canvas
-                ref={playersCanvas}
-                width={wpx * scale}
-                height={hpx * scale}
-                style={{ position: "absolute", width: wpx * scale, height: hpx * scale }}
-              />
-            </div>
+            <canvas
+              ref={playersCanvas}
+              width={vpW * scale}
+              height={vpH * scale}
+              style={{
+                display: "block",
+                width: vpW * scale,
+                height: vpH * scale,
+                imageRendering: "pixelated",
+                border: "var(--bw) solid var(--c-border)",
+              }}
+            />
           </PixelPanel>
           <div
             className="px-toolbar"
@@ -448,7 +453,7 @@ export function GameView({
             alignSelf: "stretch",
             display: "flex",
             flexDirection: "column",
-            height: isMobile ? 280 : hpx * scale,
+            height: isMobile ? 280 : vpH * scale,
             padding: "var(--sp-2)",
           }}
         >
@@ -498,7 +503,7 @@ export function GameView({
           <PixelInput
             autoFocus
             value={draft}
-            placeholder="Fala algo… (só quem está no seu raio recebe)"
+            placeholder="Fala algo… (quem está por perto ouve)"
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
